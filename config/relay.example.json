@@ -17,6 +17,7 @@
   },
   "web": {
     "appName": "Mobile Codex",
-    "pollIntervalMs": 2500
+    "pollIntervalMs": 2500,
+    "pairCommandConfigPathHint": "config/agent.local.json"
   }
 }

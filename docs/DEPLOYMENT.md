@@ -46,6 +46,7 @@ Notes:
 - The relay init script generates a plaintext `BOOTSTRAP_TOKEN` and prints it once.
 - The relay config stores only the hash, not the plaintext token.
 - Both init scripts keep `codexExecWrite` disabled by default.
+- The relay init script also sets a pairing command config-path hint used by the web UI.
 
 ## TLS
 
@@ -86,7 +87,7 @@ Type=simple
 User=mobilecodexrelay
 Group=mobilecodexrelay
 WorkingDirectory=/opt/mobile-codex
-ExecStart=/usr/bin/node /opt/mobile-codex/relay/server.js --config /etc/mobile-codex/relay.prod.json
+ExecStart=/usr/bin/npm run relay:start -- --config /etc/mobile-codex/relay.prod.json
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
@@ -113,7 +114,7 @@ Type=simple
 User=mobilecodexagent
 Group=mobilecodexagent
 WorkingDirectory=/opt/mobile-codex
-ExecStart=/usr/bin/node /opt/mobile-codex/agent/agent.js --config /etc/mobile-codex/agent.prod.json
+ExecStart=/usr/bin/npm run agent:start -- --config /etc/mobile-codex/agent.prod.json
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
@@ -149,7 +150,7 @@ Recommended first-run order:
 Manual agent pairing example:
 
 ```bash
-sudo -u mobilecodexagent -H /usr/bin/node /opt/mobile-codex/agent/agent.js --config /etc/mobile-codex/agent.prod.json --pair-code YOUR_CODE
+sudo -u mobilecodexagent -H /usr/bin/npm run agent:pair -- --config /etc/mobile-codex/agent.prod.json --pair-code YOUR_CODE
 ```
 
 ## Validation Order

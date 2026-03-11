@@ -17,6 +17,18 @@ const taskType = document.querySelector("#task-type");
 const actionSelect = document.querySelector("#task-action-id");
 const logSelect = document.querySelector("#task-log-source-id");
 const logoutButton = document.querySelector("#logout-button");
+const pairCommandBox = document.querySelector("#pair-command-box");
+const pairCommand = document.querySelector("#pair-command");
+const copyPairCommandButton = document.querySelector("#copy-pair-command");
+
+function shellEscape(value) {
+  return `'${String(value).replaceAll("'", `'\"'\"'`)}'`;
+}
+
+function buildPairCommand(pairingCode) {
+  const configPathHint = state.data?.web?.pairCommandConfigPathHint || "config/agent.local.json";
+  return `npm run agent:pair -- --config ${shellEscape(configPathHint)} --pair-code ${shellEscape(pairingCode)}`;
+}
 
 function showDashboard(visible) {
   loginPanel.classList.toggle("hidden", visible);
@@ -225,8 +237,24 @@ pairForm.addEventListener("submit", async (event) => {
       }
     });
     pairResult.textContent = `Pairing code: ${body.pairingCode}\nExpires: ${body.expiresAt}`;
+    pairCommand.value = buildPairCommand(body.pairingCode);
+    pairCommandBox.classList.remove("hidden");
   } catch (error) {
     alert(String(error.message || error));
+  }
+});
+
+copyPairCommandButton.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(pairCommand.value);
+    copyPairCommandButton.textContent = "Copied";
+    setTimeout(() => {
+      copyPairCommandButton.textContent = "Copy Pair Command";
+    }, 1200);
+  } catch {
+    pairCommand.focus();
+    pairCommand.select();
+    alert("Copy failed. The command has been selected for manual copy.");
   }
 });
 

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   askChoice,
   askText,
@@ -13,6 +14,8 @@ import {
 } from "./init-common.js";
 
 const args = parseInitArgs(process.argv);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, "..");
 
 const presets = {
   test: {
@@ -20,14 +23,16 @@ const presets = {
     listenHost: "127.0.0.1",
     listenPort: "8787",
     publicOrigin: "http://127.0.0.1:8787",
-    dataDir: "../data/relay"
+    dataDir: path.join(projectRoot, "data", "relay"),
+    pairCommandConfigPathHint: "config/agent.local.json"
   },
   production: {
     output: "config/relay.prod.json",
     listenHost: "127.0.0.1",
     listenPort: "8787",
     publicOrigin: "https://mobile-codex.example.com",
-    dataDir: "/var/lib/mobile-codex-relay"
+    dataDir: "/var/lib/mobile-codex-relay",
+    pairCommandConfigPathHint: "/etc/mobile-codex/agent.prod.json"
   }
 };
 
@@ -68,6 +73,12 @@ async function main() {
       (value) => validateUrl(value, mode === "production")
     );
     const dataDir = await askText(rl, "Relay state directory", preset.dataDir, validateNonEmpty);
+    const pairCommandConfigPathHint = await askText(
+      rl,
+      "Agent config path hint shown in the pairing command",
+      preset.pairCommandConfigPathHint,
+      validateNonEmpty
+    );
 
     const secrets = buildRelaySecrets();
     const config = {
@@ -89,7 +100,8 @@ async function main() {
       },
       web: {
         appName: "Mobile Codex",
-        pollIntervalMs: 2500
+        pollIntervalMs: 2500,
+        pairCommandConfigPathHint
       }
     };
 
@@ -106,7 +118,7 @@ async function main() {
     console.log("- codexExecWrite is disabled by default for safety.");
     console.log("");
     console.log("Next step:");
-    console.log(`node relay/server.js --config ${path.resolve(writtenPath)}`);
+    console.log(`npm run relay:start -- --config ${path.resolve(writtenPath)}`);
   } finally {
     rl.close();
   }

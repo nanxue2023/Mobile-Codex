@@ -34,8 +34,11 @@
 
 1. 运行 `npm run init:relay`
 2. 运行 `npm run init:agent`
-3. 按详细教程进行本地测试
-4. 本地跑通后再进入正式部署
+3. 用 `npm run relay:start` 启动 relay
+4. 打开网页并创建 pairing code
+5. 用 `npm run agent:pair -- --pair-code YOUR_CODE` 完成配对
+6. 后续用 `npm run agent:start` 正常启动 agent
+7. 详细教程只在你需要手工配置或正式部署时再看
 
 ## 📚 文档
 

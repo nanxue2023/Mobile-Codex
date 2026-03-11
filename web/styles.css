@@ -176,6 +176,10 @@ pre {
   color: #e8f6ed;
 }
 
+#pair-command-box {
+  margin-top: 12px;
+}
+
 .error {
   color: var(--danger);
 }

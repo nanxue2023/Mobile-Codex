@@ -144,7 +144,7 @@ async function main() {
     console.log("Next step:");
     console.log("1. Start the relay and log into the web UI.");
     console.log("2. Create a pairing code from the UI.");
-    console.log(`3. Run: node agent/agent.js --config ${path.resolve(writtenPath)} --pair-code YOUR_CODE`);
+    console.log(`3. Run: npm run agent:pair -- --config ${path.resolve(writtenPath)} --pair-code YOUR_CODE`);
   } finally {
     rl.close();
   }

@@ -34,8 +34,11 @@ This project is a security-first MVP for running Codex from your phone without e
 
 1. Run `npm run init:relay`
 2. Run `npm run init:agent`
-3. Follow the detailed tutorial
-4. Test locally first, then move to production deployment
+3. Start the relay with `npm run relay:start`
+4. Open the web UI and create a pairing code
+5. Pair the agent with `npm run agent:pair -- --pair-code YOUR_CODE`
+6. Start the agent normally with `npm run agent:start`
+7. Use the detailed tutorial only if you want the manual path or deployment details
 
 ## 📚 Documentation
 

@@ -7,6 +7,9 @@
   "scripts": {
     "relay": "node relay/server.js",
     "agent": "node agent/agent.js",
+    "relay:start": "node scripts/start-relay.js",
+    "agent:start": "node scripts/start-agent.js",
+    "agent:pair": "node scripts/start-agent.js --pair",
     "init:relay": "node scripts/init-relay.js",
     "init:agent": "node scripts/init-agent.js",
     "gen-secret": "node scripts/gen-secret.js",

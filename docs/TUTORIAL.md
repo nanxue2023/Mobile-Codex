@@ -37,9 +37,10 @@ The easiest path is now:
 
 1. `npm run init:relay`
 2. `npm run init:agent`
-3. review the generated config files
-4. start relay
-5. pair the agent
+3. `npm run relay:start`
+4. create a pairing code in the UI
+5. `npm run agent:pair -- --pair-code YOUR_CODE`
+6. later use `npm run agent:start`
 
 The manual JSON editing steps below are still included so you can understand what the scripts generate.
 
@@ -122,9 +123,22 @@ The scripts will:
 - write `config/agent.local.json`
 - keep `codexExecWrite` disabled by default
 
+After that, the recommended commands are:
+
+```bash
+npm run relay:start
+npm run agent:pair -- --pair-code YOUR_CODE
+```
+
+Later restarts:
+
+```bash
+npm run agent:start
+```
+
 After that, you can skip ahead to:
 
-- [Start the Relay](#9-start-the-relay)
+- [Open the Web UI](#11-open-the-web-ui)
 
 ## 7. Manual Path: Copy Local Config Files
 
@@ -255,7 +269,7 @@ Notes:
 Run:
 
 ```bash
-node relay/server.js --config config/relay.local.json
+npm run relay:start
 ```
 
 Expected output:
@@ -289,13 +303,23 @@ In the UI:
 
 You will get a one-time pairing code.
 
+The UI now also shows a copyable suggested command, for example:
+
+```bash
+npm run agent:pair -- --config 'config/agent.local.json' --pair-code 'YOUR_CODE'
+```
+
+Use that command directly on the agent machine if the shown config path matches your setup.
+
 ## 13. Start the Agent
 
 Use the pairing code:
 
 ```bash
-node agent/agent.js --config config/agent.local.json --pair-code YOUR_CODE
+npm run agent:pair -- --pair-code YOUR_CODE
 ```
+
+If the UI generated a command with `--config ...`, prefer copying that exact command.
 
 On first success:
 
@@ -305,7 +329,7 @@ On first success:
 Next time you can start it without the pairing code:
 
 ```bash
-node agent/agent.js --config config/agent.local.json
+npm run agent:start
 ```
 
 ## 14. Confirm the Agent Is Visible

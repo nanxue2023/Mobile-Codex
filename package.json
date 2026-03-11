@@ -12,6 +12,7 @@
     "agent:pair": "node scripts/start-agent.js --pair",
     "init:relay": "node scripts/init-relay.js",
     "init:agent": "node scripts/init-agent.js",
+    "scaffold:production": "node scripts/scaffold-production.js",
     "gen-secret": "node scripts/gen-secret.js",
     "hash-token": "node scripts/hash-token.js",
     "check": "node scripts/check-config.js"

@@ -32,13 +32,25 @@
 
 ## 🚀 快速开始
 
+### 本地测试
+
 1. 运行 `npm run init:relay`
 2. 运行 `npm run init:agent`
 3. 用 `npm run relay:start` 启动 relay
 4. 打开网页并创建 pairing code
 5. 用 `npm run agent:pair -- --pair-code YOUR_CODE` 完成配对
 6. 后续用 `npm run agent:start` 正常启动 agent
-7. 详细教程只在你需要手工配置或正式部署时再看
+
+### 正式部署
+
+1. 运行 `npm run init:relay -- --mode production`
+2. 运行 `npm run init:agent -- --mode production`
+3. 用 `npm run scaffold:production` 生成部署模板
+4. 从 `deploy/generated/` 复制生成的 `systemd` 和 `Caddy` 模板
+5. 用 `npm run relay:start -- --config /etc/mobile-codex/relay.prod.json` 启动 relay
+6. 打开网页，创建 pairing code，并使用网页建议的配对命令
+
+如果你需要完整的手工部署流程或主机加固细节，再看详细教程和部署文档。
 
 ## 📚 文档
 

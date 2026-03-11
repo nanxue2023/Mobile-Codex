@@ -4,6 +4,13 @@ This guide walks from zero to a working local test setup.
 
 If you want production deployment, read [DEPLOYMENT.md](./DEPLOYMENT.md) after this guide.
 
+For production, the shortest path is now:
+
+1. `npm run init:relay -- --mode production`
+2. `npm run init:agent -- --mode production`
+3. `npm run scaffold:production`
+4. copy the generated deployment templates
+
 ## 1. What You Will Build
 
 You will run:

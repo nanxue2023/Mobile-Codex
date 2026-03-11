@@ -48,6 +48,32 @@ Notes:
 - Both init scripts keep `codexExecWrite` disabled by default.
 - The relay init script also sets a pairing command config-path hint used by the web UI.
 
+## Deployment Template Generation
+
+After you have both production configs, generate host-level templates:
+
+```bash
+npm run scaffold:production
+```
+
+By default this writes:
+
+- `deploy/generated/mobile-codex-relay.service`
+- `deploy/generated/mobile-codex-agent.service`
+- `deploy/generated/Caddyfile`
+- `deploy/generated/NEXT_STEPS.md`
+
+You can also override paths:
+
+```bash
+npm run scaffold:production -- \
+  --relay-config /etc/mobile-codex/relay.prod.json \
+  --agent-config /etc/mobile-codex/agent.prod.json \
+  --output-dir /tmp/mobile-codex-deploy
+```
+
+This does not modify your system directly. It only generates templates and a checklist.
+
 ## TLS
 
 Do not expose the relay over plain HTTP on the internet.
@@ -72,6 +98,8 @@ mobile-codex.example.com {
     reverse_proxy 127.0.0.1:8787
 }
 ```
+
+If you used `npm run scaffold:production`, the generated `Caddyfile` will already match your configured `publicOrigin`.
 
 ## systemd
 
@@ -133,6 +161,7 @@ Important:
 - If `node` is not at `/usr/bin/node`, replace it with the real path from `which node`.
 - The agent service user must be able to run `codex`.
 - The agent service user must already be logged in to Codex if you want `codex exec`.
+- If you used `npm run scaffold:production`, prefer copying the generated service files instead of retyping them.
 
 ## First Pairing
 

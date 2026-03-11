@@ -6,3 +6,4 @@ node_modules/
 web-cache/
 config/.codex-last-*
 config/*.prod.json
+deploy/generated/

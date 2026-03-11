@@ -26,10 +26,22 @@ You need:
 In commands below, replace:
 
 ```text
-/path/to/codex-bridge-mvp
+/path/to/mobile-codex
 ```
 
 with your real project path.
+
+## 2.5 Recommended Setup Flow
+
+The easiest path is now:
+
+1. `npm run init:relay`
+2. `npm run init:agent`
+3. review the generated config files
+4. start relay
+5. pair the agent
+
+The manual JSON editing steps below are still included so you can understand what the scripts generate.
 
 ## 3. The Three Important Values
 
@@ -52,7 +64,7 @@ Important:
 Go to the project:
 
 ```bash
-cd /path/to/codex-bridge-mvp
+cd /path/to/mobile-codex
 ```
 
 Run twice:
@@ -92,7 +104,29 @@ Example:
 BOOTSTRAP_TOKEN_HASH='paste-the-hash-output-here'
 ```
 
-## 6. Create Local Config Files
+## 6. Easiest Path: Generate Local Config Files
+
+Run:
+
+```bash
+npm run init:relay
+npm run init:agent
+```
+
+Choose `test` mode in both scripts.
+
+The scripts will:
+
+- generate the relay secrets safely
+- write `config/relay.local.json`
+- write `config/agent.local.json`
+- keep `codexExecWrite` disabled by default
+
+After that, you can skip ahead to:
+
+- [Start the Relay](#9-start-the-relay)
+
+## 7. Manual Path: Copy Local Config Files
 
 Copy the examples:
 
@@ -103,7 +137,7 @@ cp config/agent.example.json config/agent.local.json
 
 These `.local.json` files are intentionally ignored by git.
 
-## 7. Edit `config/relay.local.json`
+## 8. Manual Path: Edit `config/relay.local.json`
 
 Open the file:
 
@@ -132,7 +166,7 @@ Use a local test config like this:
     "readLog": true
   },
   "web": {
-    "appName": "Codex Bridge",
+    "appName": "Mobile Codex",
     "pollIntervalMs": 2500
   }
 }
@@ -150,7 +184,7 @@ Keep these for first test:
 - `publicOrigin = http://127.0.0.1:8787`
 - `codexExecWrite = false`
 
-## 8. Edit `config/agent.local.json`
+## 9. Manual Path: Edit `config/agent.local.json`
 
 Open:
 
@@ -216,7 +250,7 @@ Notes:
 - `actions` are predefined commands, not arbitrary shell
 - `logSources` are predefined absolute paths, not arbitrary file reads
 
-## 9. Start the Relay
+## 10. Start the Relay
 
 Run:
 
@@ -230,7 +264,7 @@ Expected output:
 relay listening on http://127.0.0.1:8787
 ```
 
-## 10. Open the Web UI
+## 11. Open the Web UI
 
 Open:
 
@@ -244,7 +278,7 @@ Log in using:
 
 Do not use the hash in the login screen.
 
-## 11. Create a Pairing Code
+## 12. Create a Pairing Code
 
 In the UI:
 
@@ -255,7 +289,7 @@ In the UI:
 
 You will get a one-time pairing code.
 
-## 12. Start the Agent
+## 13. Start the Agent
 
 Use the pairing code:
 
@@ -274,7 +308,7 @@ Next time you can start it without the pairing code:
 node agent/agent.js --config config/agent.local.json
 ```
 
-## 13. Confirm the Agent Is Visible
+## 14. Confirm the Agent Is Visible
 
 Go back to the UI and refresh.
 
@@ -285,7 +319,7 @@ You should see:
 - the configured actions
 - the configured log sources
 
-## 14. First Safe Tests
+## 15. First Safe Tests
 
 Use this order:
 
@@ -299,7 +333,7 @@ Why:
 - `Run Action` confirms command execution
 - `Codex Task` confirms the Codex integration
 
-## 15. Common Mistakes
+## 16. Common Mistakes
 
 ### The UI loads but the agent never appears
 
@@ -339,7 +373,7 @@ That is expected if:
 
 Both sides must be set to `true` before write mode is allowed.
 
-## 16. When You Are Ready for Production
+## 17. When You Are Ready for Production
 
 After local testing succeeds, continue here:
 

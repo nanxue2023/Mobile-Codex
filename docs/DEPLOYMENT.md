@@ -13,17 +13,39 @@ The development server only needs outbound access to the relay. It does not need
 
 Recommended paths:
 
-- Relay host code: `/opt/codex-bridge-mvp`
-- Relay config: `/etc/codex-bridge/relay.prod.json`
-- Relay state: `/var/lib/codex-bridge-relay`
-- Agent host code: `/opt/codex-bridge-mvp`
-- Agent config: `/etc/codex-bridge/agent.prod.json`
-- Agent workspace: `/srv/codex-bridge/workspace`
+- Relay host code: `/opt/mobile-codex`
+- Relay config: `/etc/mobile-codex/relay.prod.json`
+- Relay state: `/var/lib/mobile-codex-relay`
+- Agent host code: `/opt/mobile-codex`
+- Agent config: `/etc/mobile-codex/agent.prod.json`
+- Agent workspace: `/srv/mobile-codex/workspace`
 
 Use dedicated Unix users:
 
-- `codexrelay` for relay
-- `codexagent` for agent
+- `mobilecodexrelay` for relay
+- `mobilecodexagent` for agent
+
+## Config Generation
+
+The easiest way to create production-shaped configs is:
+
+```bash
+npm run init:relay -- --mode production
+npm run init:agent -- --mode production
+```
+
+You can also choose a custom output path:
+
+```bash
+npm run init:relay -- --mode production --output /etc/mobile-codex/relay.prod.json
+npm run init:agent -- --mode production --output /etc/mobile-codex/agent.prod.json
+```
+
+Notes:
+
+- The relay init script generates a plaintext `BOOTSTRAP_TOKEN` and prints it once.
+- The relay config stores only the hash, not the plaintext token.
+- Both init scripts keep `codexExecWrite` disabled by default.
 
 ## TLS
 
@@ -44,7 +66,7 @@ Recommended baseline:
 Example Caddyfile:
 
 ```caddy
-bridge.example.com {
+mobile-codex.example.com {
     encode zstd gzip
     reverse_proxy 127.0.0.1:8787
 }
@@ -56,23 +78,23 @@ bridge.example.com {
 
 ```ini
 [Unit]
-Description=Codex Bridge Relay
+Description=Mobile Codex Relay
 After=network.target
 
 [Service]
 Type=simple
-User=codexrelay
-Group=codexrelay
-WorkingDirectory=/opt/codex-bridge-mvp
-ExecStart=/usr/bin/node /opt/codex-bridge-mvp/relay/server.js --config /etc/codex-bridge/relay.prod.json
+User=mobilecodexrelay
+Group=mobilecodexrelay
+WorkingDirectory=/opt/mobile-codex
+ExecStart=/usr/bin/node /opt/mobile-codex/relay/server.js --config /etc/mobile-codex/relay.prod.json
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/lib/codex-bridge-relay
-ReadOnlyPaths=/opt/codex-bridge-mvp /etc/codex-bridge/relay.prod.json
+ReadWritePaths=/var/lib/mobile-codex-relay
+ReadOnlyPaths=/opt/mobile-codex /etc/mobile-codex/relay.prod.json
 
 [Install]
 WantedBy=multi-user.target
@@ -82,24 +104,24 @@ WantedBy=multi-user.target
 
 ```ini
 [Unit]
-Description=Codex Bridge Agent
+Description=Mobile Codex Agent
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
-User=codexagent
-Group=codexagent
-WorkingDirectory=/opt/codex-bridge-mvp
-ExecStart=/usr/bin/node /opt/codex-bridge-mvp/agent/agent.js --config /etc/codex-bridge/agent.prod.json
+User=mobilecodexagent
+Group=mobilecodexagent
+WorkingDirectory=/opt/mobile-codex
+ExecStart=/usr/bin/node /opt/mobile-codex/agent/agent.js --config /etc/mobile-codex/agent.prod.json
 Restart=always
 RestartSec=3
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
-ReadOnlyPaths=/opt/codex-bridge-mvp /etc/codex-bridge/agent.prod.json
-ReadWritePaths=/srv/codex-bridge /etc/codex-bridge/agent.prod.json
+ReadOnlyPaths=/opt/mobile-codex /etc/mobile-codex/agent.prod.json
+ReadWritePaths=/srv/mobile-codex /etc/mobile-codex/agent.prod.json
 
 [Install]
 WantedBy=multi-user.target
@@ -127,7 +149,7 @@ Recommended first-run order:
 Manual agent pairing example:
 
 ```bash
-sudo -u codexagent -H /usr/bin/node /opt/codex-bridge-mvp/agent/agent.js --config /etc/codex-bridge/agent.prod.json --pair-code YOUR_CODE
+sudo -u mobilecodexagent -H /usr/bin/node /opt/mobile-codex/agent/agent.js --config /etc/mobile-codex/agent.prod.json --pair-code YOUR_CODE
 ```
 
 ## Validation Order

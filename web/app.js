@@ -1,5 +1,5 @@
 const state = {
-  token: localStorage.getItem("codexBridgeToken") || "",
+  token: localStorage.getItem("mobileCodexToken") || "",
   data: null,
   pollTimer: null
 };
@@ -155,13 +155,13 @@ async function login(bootstrapToken) {
     body: { bootstrapToken }
   });
   state.token = data.token;
-  localStorage.setItem("codexBridgeToken", state.token);
+  localStorage.setItem("mobileCodexToken", state.token);
   showDashboard(true);
   await refresh();
 }
 
 function logout() {
-  localStorage.removeItem("codexBridgeToken");
+  localStorage.removeItem("mobileCodexToken");
   state.token = "";
   state.data = null;
   if (state.pollTimer) {

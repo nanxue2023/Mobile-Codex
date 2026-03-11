@@ -16,7 +16,7 @@
     "readLog": true
   },
   "web": {
-    "appName": "Codex Bridge",
+    "appName": "Mobile Codex",
     "pollIntervalMs": 2500
   }
 }

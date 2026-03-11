@@ -1,4 +1,4 @@
-# Codex Bridge MVP
+# Mobile Codex
 
 [简体中文](./README.zh-CN.md)
 
@@ -32,10 +32,10 @@ This project is a security-first MVP for running Codex from your phone without e
 
 ## 🚀 Quick Start
 
-1. Copy the example configs.
-2. Follow the detailed tutorial.
-3. Test locally first.
-4. Move to the production deployment guide.
+1. Run `npm run init:relay`
+2. Run `npm run init:agent`
+3. Follow the detailed tutorial
+4. Test locally first, then move to production deployment
 
 ## 📚 Documentation
 

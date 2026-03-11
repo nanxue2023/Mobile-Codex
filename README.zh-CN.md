@@ -1,4 +1,4 @@
-# Codex Bridge MVP
+# Mobile Codex
 
 [English](./README.md)
 
@@ -32,9 +32,10 @@
 
 ## 🚀 快速开始
 
-1. 复制示例配置
-2. 按详细教程进行本地测试
-3. 本地跑通后再进入正式部署
+1. 运行 `npm run init:relay`
+2. 运行 `npm run init:agent`
+3. 按详细教程进行本地测试
+4. 本地跑通后再进入正式部署
 
 ## 📚 文档
 

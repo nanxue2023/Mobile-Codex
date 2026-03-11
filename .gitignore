@@ -5,3 +5,4 @@ node_modules/
 *.local
 web-cache/
 config/.codex-last-*
+config/*.prod.json

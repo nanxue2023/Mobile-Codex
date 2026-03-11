@@ -1,0 +1,7 @@
+data/
+node_modules/
+*.log
+*.local.json
+*.local
+web-cache/
+config/.codex-last-*

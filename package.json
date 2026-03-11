@@ -1,0 +1,17 @@
+{
+  "name": "codex-bridge-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Secure mobile-first remote control MVP for Codex.",
+  "scripts": {
+    "relay": "node relay/server.js",
+    "agent": "node agent/agent.js",
+    "gen-secret": "node scripts/gen-secret.js",
+    "hash-token": "node scripts/hash-token.js",
+    "check": "node scripts/check-config.js"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

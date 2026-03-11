@@ -1,0 +1,204 @@
+:root {
+  --bg: #f5f1e8;
+  --panel: rgba(255, 253, 247, 0.88);
+  --ink: #18211b;
+  --muted: #5d695f;
+  --accent: #0d291f;
+  --accent-soft: #c8dfd1;
+  --line: rgba(24, 33, 27, 0.12);
+  --danger: #8d2323;
+  --shadow: 0 18px 42px rgba(23, 26, 21, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(13, 41, 31, 0.11), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(145, 90, 38, 0.18), transparent 28%),
+    linear-gradient(160deg, #f8f4eb 0%, #efe6d3 100%);
+  font: 16px/1.5 "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+}
+
+.app-shell {
+  width: min(720px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+.hero {
+  padding: 24px 6px 14px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font: 600 0.78rem/1 "Avenir Next", "Segoe UI", sans-serif;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: clamp(2.4rem, 8vw, 4.5rem);
+  letter-spacing: -0.04em;
+}
+
+h2 {
+  margin-bottom: 12px;
+  font-size: 1.2rem;
+}
+
+.subhead,
+.hint,
+.task-meta,
+.task-card header p {
+  color: var(--muted);
+}
+
+.panel {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow);
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 10px;
+}
+
+label,
+form {
+  display: grid;
+  gap: 8px;
+}
+
+form {
+  gap: 14px;
+}
+
+input,
+select,
+textarea,
+button,
+pre {
+  width: 100%;
+  border-radius: 16px;
+  font: inherit;
+}
+
+input,
+select,
+textarea {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+}
+
+textarea {
+  resize: vertical;
+}
+
+button {
+  padding: 13px 16px;
+  border: 0;
+  background: var(--accent);
+  color: #f8f3ea;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.switch-row {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.task-card {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.task-card + .task-card {
+  margin-top: 12px;
+}
+
+.task-card header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.task-body,
+.task-summary {
+  margin: 10px 0 0;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.result-box,
+pre {
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  background: #142018;
+  color: #e8f6ed;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: calc(100vw - 18px);
+  }
+
+  .panel {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .task-card header,
+  .toolbar,
+  .toolbar-actions,
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

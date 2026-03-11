@@ -1,0 +1,22 @@
+{
+  "listenHost": "127.0.0.1",
+  "listenPort": 8787,
+  "publicOrigin": "http://127.0.0.1:8787",
+  "dataDir": "../data/relay",
+  "sessionTtlSec": 43200,
+  "maxLoginAttemptsPerMinute": 10,
+  "maxPairAttemptsPerMinute": 20,
+  "bootstrapAdminTokenHash": "REPLACE_WITH_SHA256_HEX",
+  "tokenSecret": "REPLACE_WITH_32_PLUS_RANDOM_BYTES",
+  "features": {
+    "pairings": true,
+    "codexExec": true,
+    "codexExecWrite": false,
+    "runAction": true,
+    "readLog": true
+  },
+  "web": {
+    "appName": "Codex Bridge",
+    "pollIntervalMs": 2500
+  }
+}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#0d291f">
+    <title>Codex Bridge</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Mobile Remote Control</p>
+        <h1>Codex Bridge</h1>
+        <p class="subhead">Phone-native control plane for Codex tasks, predefined actions, and approved log access.</p>
+      </section>
+
+      <section id="login-panel" class="panel">
+        <h2>Login</h2>
+        <form id="login-form">
+          <label>
+            <span>Bootstrap Token</span>
+            <input id="bootstrap-token" type="password" autocomplete="off" required>
+          </label>
+          <button type="submit">Unlock</button>
+        </form>
+        <p class="hint">Use a long bootstrap token stored in your password manager. The app stores only a signed session token.</p>
+      </section>
+
+      <section id="dashboard" class="hidden">
+        <section class="panel toolbar">
+          <div>
+            <h2>Agents</h2>
+            <p id="status-line" class="hint">Connecting…</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="refresh-button" type="button">Refresh</button>
+            <button id="logout-button" type="button" class="secondary">Logout</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>Pair Agent</h2>
+          <form id="pair-form">
+            <label>
+              <span>Note</span>
+              <input id="pair-note" type="text" maxlength="120" placeholder="Server or environment name">
+            </label>
+            <label>
+              <span>TTL Seconds</span>
+              <input id="pair-ttl" type="number" min="60" max="1800" value="300">
+            </label>
+            <button type="submit">Create Pair Code</button>
+          </form>
+          <pre id="pair-result" class="result-box"></pre>
+        </section>
+
+        <section class="panel">
+          <h2>New Task</h2>
+          <form id="task-form">
+            <label>
+              <span>Agent</span>
+              <select id="agent-id" required></select>
+            </label>
+            <label>
+              <span>Type</span>
+              <select id="task-type">
+                <option value="codex_exec">Codex Task</option>
+                <option value="run_action">Run Action</option>
+                <option value="read_log">Read Log</option>
+              </select>
+            </label>
+            <label id="codex-prompt-row">
+              <span>Prompt</span>
+              <textarea id="task-prompt" rows="5" placeholder="Describe the coding task you want Codex to perform."></textarea>
+            </label>
+            <label id="cwd-row">
+              <span>Relative CWD</span>
+              <input id="task-cwd" type="text" value=".">
+            </label>
+            <label id="write-row" class="switch-row">
+              <span>Allow Workspace Writes</span>
+              <input id="task-write" type="checkbox">
+            </label>
+            <label id="action-row" class="hidden">
+              <span>Action</span>
+              <select id="task-action-id"></select>
+            </label>
+            <label id="log-row" class="hidden">
+              <span>Log Source</span>
+              <select id="task-log-source-id"></select>
+            </label>
+            <button type="submit">Submit Task</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>Tasks</h2>
+          <div id="tasks"></div>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

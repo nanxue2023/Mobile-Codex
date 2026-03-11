@@ -1,0 +1,41 @@
+{
+  "relayBaseUrl": "http://127.0.0.1:8787",
+  "agentId": "server-main",
+  "agentLabel": "Main Server",
+  "agentToken": "",
+  "workspaceRoot": "/absolute/path/to/your/repo",
+  "pollIntervalMs": 2500,
+  "maxTaskLogBytes": 12000,
+  "features": {
+    "codexExec": true,
+    "codexExecWrite": false,
+    "runAction": true,
+    "readLog": true
+  },
+  "actions": {
+    "status": {
+      "label": "Git Status",
+      "cwd": ".",
+      "argv": ["git", "status", "--short"],
+      "timeoutSec": 20
+    },
+    "test": {
+      "label": "Run Tests",
+      "cwd": ".",
+      "argv": ["npm", "test"],
+      "timeoutSec": 600
+    }
+  },
+  "logSources": {
+    "app": {
+      "label": "Application Log",
+      "path": "/absolute/path/to/app.log",
+      "maxLines": 200
+    }
+  },
+  "codex": {
+    "model": "",
+    "extraArgs": [],
+    "writeModeDefaultsToOff": true
+  }
+}

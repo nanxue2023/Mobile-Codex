@@ -43,7 +43,7 @@
             <p class="hint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
           </details>
           <details id="invite-login-box" class="auth-box">
-            <summary>Join A Workspace</summary>
+            <summary>Use An Invite</summary>
             <form id="invite-login-form">
               <label>
                 <span>Invite Code</span>
@@ -55,7 +55,7 @@
               </label>
               <button type="submit">Join With Invite</button>
             </form>
-            <p class="hint">Use a workspace invite to create your own account and keep agents, tasks, and sessions isolated.</p>
+            <p class="hint">An account invite creates your own user without joining someone else's workspace. A workspace invite lets you collaborate inside the current workspace.</p>
           </details>
         </article>
       </section>
@@ -249,7 +249,7 @@
                 </form>
                 <form id="join-workspace-form">
                   <label>
-                    <span>Join With Invite</span>
+                    <span>Join Workspace With Invite</span>
                     <input id="join-invite-code" type="text" maxlength="32" placeholder="ABCD-EFGH-IJKL">
                   </label>
                   <button id="join-workspace-button" type="submit" class="secondary">Join Existing Workspace</button>
@@ -264,6 +264,13 @@
                   </div>
                 </div>
                 <form id="invite-form">
+                  <label>
+                    <span>Invite Type</span>
+                    <select id="invite-type">
+                      <option value="account">Account Invite</option>
+                      <option value="workspace">Workspace Invite</option>
+                    </select>
+                  </label>
                   <label>
                     <span>Role</span>
                     <select id="invite-role">

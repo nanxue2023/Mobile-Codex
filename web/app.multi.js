@@ -55,6 +55,8 @@ const passkeyList = document.querySelector("#passkey-list");
 const passkeyLabelInput = document.querySelector("#passkey-label");
 const memberList = document.querySelector("#member-list");
 const inviteList = document.querySelector("#invite-list");
+const inviteTypeSelect = document.querySelector("#invite-type");
+const inviteRoleSelect = document.querySelector("#invite-role");
 
 function bytesToBase64Url(value) {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
@@ -460,11 +462,16 @@ function invitationCard(invitation) {
     <article class="session-card">
       <header>
         <div>
-          <strong>${escapeHtml(invitation.role)}</strong>
+          <strong>${escapeHtml(invitation.type === "account" ? "Account Invite" : `${invitation.role} Invite`)}</strong>
           <p>${escapeHtml(invitation.createdByDisplayName || "Workspace owner")}</p>
         </div>
         <div class="task-meta">Expires ${new Date(invitation.expiresAt).toLocaleString()}</div>
       </header>
+      ${
+        invitation.type === "workspace" && invitation.workspaceName
+          ? `<p class="task-summary">Workspace: ${escapeHtml(invitation.workspaceName)}</p>`
+          : "<p class='task-summary'>Creates a standalone user account. The user can create their own workspace after registering a passkey.</p>"
+      }
       ${invitation.note ? `<p class="task-body">${escapeHtml(invitation.note)}</p>` : ""}
       <div class="actions">
         <button type="button" class="secondary" data-revoke-invite="${invitation.inviteId}">Revoke Invite</button>
@@ -564,7 +571,7 @@ function renderSecurityPanels(data) {
   const permissions = auth.permissions || {};
   workspaceForm.classList.toggle("hidden", !permissions.createWorkspaces);
   joinWorkspaceForm.classList.toggle("hidden", !state.authenticated);
-  inviteForm.classList.toggle("hidden", !permissions.manageMembers || !data.currentWorkspace);
+  inviteForm.classList.toggle("hidden", !(permissions.manageMembers || permissions.createAccountInvites));
   memberList.innerHTML =
     permissions.manageMembers && data.currentWorkspace
       ? (data.members || []).map(memberCard).join("") || "<p class='hint'>No members yet.</p>"
@@ -655,6 +662,14 @@ function syncTaskFields() {
   document.querySelector("#action-row").classList.toggle("hidden", type !== "run_action");
   document.querySelector("#log-row").classList.toggle("hidden", type !== "read_log");
   promptLabel.textContent = isResume ? "Continue Prompt" : "Prompt";
+}
+
+function syncInviteFields() {
+  const inviteType = inviteTypeSelect?.value || "account";
+  const roleLabel = inviteRoleSelect?.closest("label");
+  if (roleLabel) {
+    roleLabel.classList.toggle("hidden", inviteType !== "workspace");
+  }
 }
 
 async function refreshAuthStatus() {
@@ -807,15 +822,20 @@ async function createWorkspace(name) {
 }
 
 async function createInvite(role, ttlSec, note) {
+  const type = inviteTypeSelect?.value || "account";
   const result = await api("/api/admin/invitations", {
     method: "POST",
     body: {
+      type,
       role,
       ttlSec,
       note
     }
   });
-  inviteResult.textContent = `Invite code: ${result.inviteCode}\nRole: ${result.invitation.role}\nExpires: ${result.invitation.expiresAt}`;
+  inviteResult.textContent =
+    result.invitation.type === "account"
+      ? `Invite code: ${result.inviteCode}\nType: Account Invite\nExpires: ${result.invitation.expiresAt}\nThis creates a standalone user account.`
+      : `Invite code: ${result.inviteCode}\nType: Workspace Invite\nRole: ${result.invitation.role}\nWorkspace: ${result.invitation.workspaceName || "Current Workspace"}\nExpires: ${result.invitation.expiresAt}`;
   await refresh();
 }
 
@@ -904,6 +924,7 @@ viewNav.addEventListener("click", (event) => {
   setActiveView(button.dataset.viewTarget);
 });
 
+inviteTypeSelect?.addEventListener("change", syncInviteFields);
 workspaceSelect.addEventListener("change", async () => {
   if (!workspaceSelect.value) {
     return;
@@ -1123,6 +1144,7 @@ inviteList.addEventListener("click", async (event) => {
 });
 
 syncTaskFields();
+syncInviteFields();
 setActiveView(state.activeView);
 showDashboard(false);
 

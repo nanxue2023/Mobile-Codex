@@ -23,7 +23,8 @@ The project is built around three pieces:
 - Pair agents with a short code plus phone approval instead of long direct-use codes
 - Use passkeys for daily login, keeping the bootstrap token as owner recovery-only access
 - Create isolated workspaces for different people, devices, or environments
-- Invite users into a workspace without sharing the owner recovery token
+- Create standalone user accounts through account invites without putting them into your current workspace
+- Invite users into a workspace through workspace invites when you want collaboration
 - Keep dangerous capabilities off by default
 
 ## 🔐 Security Defaults

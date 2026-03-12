@@ -135,6 +135,12 @@ function createMembership(userId, workspaceId, role, createdAt = nowIso()) {
   return state.memberships[membershipId];
 }
 
+function userHasRoleAnywhere(userId, minimumRole = "owner") {
+  return activeMemberships().some(
+    (membership) => membership.userId === userId && roleAtLeast(membership.role, minimumRole)
+  );
+}
+
 function firstWorkspaceIdForUser(userId) {
   const memberships = activeMemberships()
     .filter((membership) => membership.userId === userId)
@@ -242,7 +248,8 @@ function normalizeLoadedState() {
     .filter((session) => !!session.sessionIdHash);
 
   for (const invitation of Object.values(state.invitations)) {
-    invitation.workspaceId ||= defaultWorkspaceId || "";
+    invitation.type = invitation.type === "account" ? "account" : "workspace";
+    invitation.workspaceId = invitation.type === "account" ? "" : invitation.workspaceId || defaultWorkspaceId || "";
     invitation.role = roleOrder[invitation.role] ? invitation.role : "viewer";
     invitation.note = clampText(String(invitation.note || ""), 120);
     invitation.createdAt ||= now;
@@ -537,29 +544,31 @@ function ensureSessionWorkspace(session, userId) {
   return next;
 }
 
-function buildPermissions(role, needsPasskeyEnrollment) {
+function buildPermissions(role, needsPasskeyEnrollment, hasWorkspaceMembership) {
   if (needsPasskeyEnrollment) {
     return {
-      viewWorkspace: true,
-      switchWorkspace: true,
+      viewWorkspace: !!hasWorkspaceMembership,
+      switchWorkspace: !!hasWorkspaceMembership,
       createTasks: false,
       approveTasks: false,
       pairAgents: false,
       revokeAgents: false,
       manageMembers: false,
       createWorkspaces: false,
+      createAccountInvites: false,
       managePasskeys: true
     };
   }
   return {
-    viewWorkspace: true,
-    switchWorkspace: true,
-    createTasks: roleAtLeast(role, "operator"),
-    approveTasks: roleAtLeast(role, "operator"),
-    pairAgents: roleAtLeast(role, "operator"),
-    revokeAgents: roleAtLeast(role, "owner"),
-    manageMembers: roleAtLeast(role, "owner"),
+    viewWorkspace: !!hasWorkspaceMembership,
+    switchWorkspace: !!hasWorkspaceMembership,
+    createTasks: !!hasWorkspaceMembership && roleAtLeast(role, "operator"),
+    approveTasks: !!hasWorkspaceMembership && roleAtLeast(role, "operator"),
+    pairAgents: !!hasWorkspaceMembership && roleAtLeast(role, "operator"),
+    revokeAgents: !!hasWorkspaceMembership && roleAtLeast(role, "owner"),
+    manageMembers: !!hasWorkspaceMembership && roleAtLeast(role, "owner"),
     createWorkspaces: true,
+    createAccountInvites: false,
     managePasskeys: true
   };
 }
@@ -574,6 +583,7 @@ function emptyPermissions() {
     revokeAgents: false,
     manageMembers: false,
     createWorkspaces: false,
+    createAccountInvites: false,
     managePasskeys: false
   };
 }
@@ -625,6 +635,9 @@ function sanitizeMember(membership) {
 function sanitizeInvitation(invitation) {
   return {
     inviteId: invitation.inviteId,
+    type: invitation.type || "workspace",
+    workspaceId: invitation.workspaceId || "",
+    workspaceName: invitation.workspaceId ? state.workspaces[invitation.workspaceId]?.name || "" : "",
     role: invitation.role,
     note: invitation.note || "",
     createdAt: invitation.createdAt,
@@ -651,7 +664,10 @@ function resolveSessionContext(session) {
     membership,
     workspace,
     role,
-    permissions: buildPermissions(role, !!session.needsPasskeyEnrollment)
+    permissions: {
+      ...buildPermissions(role, !!session.needsPasskeyEnrollment, !!membership),
+      createAccountInvites: !session.needsPasskeyEnrollment && userHasRoleAnywhere(user.userId, "owner")
+    }
   };
 }
 
@@ -865,15 +881,8 @@ function listState(context) {
     members: !enrollmentLocked && context.permissions.manageMembers && workspaceId
       ? currentWorkspaceMembers(workspaceId).map(sanitizeMember)
       : [],
-    invitations: !enrollmentLocked && context.permissions.manageMembers && workspaceId
-      ? Object.values(state.invitations)
-          .filter(
-            (invitation) =>
-              invitation.workspaceId === workspaceId &&
-              !invitation.usedAt &&
-              !invitation.revokedAt &&
-              Date.parse(invitation.expiresAt || "") > Date.now()
-          )
+    invitations: !enrollmentLocked
+      ? visibleInvitationsForContext(context)
           .sort((left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""))
           .map(sanitizeInvitation)
       : [],
@@ -959,7 +968,10 @@ function requirePairRequestRecord(requestId, context, res) {
 
 function requireInvitationRecord(inviteId, context, res) {
   const invitation = state.invitations[inviteId];
-  if (!invitation || (context.workspaceId && invitation.workspaceId !== context.workspaceId)) {
+  if (
+    !invitation ||
+    ((invitation.type || "workspace") === "workspace" && context.workspaceId && invitation.workspaceId !== context.workspaceId)
+  ) {
     sendJson(res, 404, { error: "invitation-not-found" }, headers);
     return null;
   }
@@ -1136,6 +1148,30 @@ function findActiveInvitationByCode(code) {
   );
 }
 
+function visibleInvitationsForContext(context) {
+  const activeInvitations = Object.values(state.invitations).filter(
+    (invitation) => !invitation.usedAt && !invitation.revokedAt && Date.parse(invitation.expiresAt || "") > Date.now()
+  );
+  const workspaceInvitations =
+    context.permissions.manageMembers && context.workspaceId
+      ? activeInvitations.filter(
+          (invitation) => (invitation.type || "workspace") === "workspace" && invitation.workspaceId === context.workspaceId
+        )
+      : [];
+  const accountInvitations = userHasRoleAnywhere(context.user.userId, "owner")
+    ? activeInvitations.filter((invitation) => (invitation.type || "workspace") === "account")
+    : [];
+
+  const seen = new Set();
+  return [...workspaceInvitations, ...accountInvitations].filter((invitation) => {
+    if (seen.has(invitation.inviteId)) {
+      return false;
+    }
+    seen.add(invitation.inviteId);
+    return true;
+  });
+}
+
 function setSessionWorkspace(session, user, workspaceId) {
   session.currentWorkspaceId = workspaceId;
   user.lastWorkspaceId = workspaceId;
@@ -1272,7 +1308,13 @@ const server = http.createServer(async (req, res) => {
         context = resolveSessionContext(existingSession);
       }
 
+      const invitationType = invitation.type || "workspace";
+
       if (context) {
+        if (invitationType === "account") {
+          sendJson(res, 409, { error: "already-authenticated-use-workspace-invite-only" }, headers);
+          return;
+        }
         if (getMembership(context.user.userId, invitation.workspaceId)) {
           sendJson(res, 409, { error: "already-workspace-member" }, headers);
           return;
@@ -1287,13 +1329,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       const newUser = createUser(body.displayName || "New User", nowIso());
-      createMembership(newUser.userId, invitation.workspaceId, invitation.role, nowIso());
-      newUser.lastWorkspaceId = invitation.workspaceId;
+      if (invitationType === "workspace") {
+        createMembership(newUser.userId, invitation.workspaceId, invitation.role, nowIso());
+        newUser.lastWorkspaceId = invitation.workspaceId;
+      } else {
+        newUser.lastWorkspaceId = "";
+      }
       invitation.usedAt = nowIso();
       invitation.redeemedByUserId = newUser.userId;
       persistState();
       const newSessionToken = issueUserSession(newUser.userId, {
-        workspaceId: invitation.workspaceId,
+        workspaceId: invitationType === "workspace" ? invitation.workspaceId : "",
         recovery: false,
         needsPasskeyEnrollment: passkeyConfig.enabled
       });
@@ -1638,20 +1684,34 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && pathname === "/api/admin/invitations") {
       const context = requireUserSession(req, res, {
-        minRole: "owner",
+        requireWorkspace: false,
         allowUnenrolled: false
       });
       if (!context) {
         return;
       }
       const body = await readJsonBody(req, 4096);
+      const inviteType = body.type === "account" ? "account" : "workspace";
+      if (inviteType === "workspace" && !context.workspaceId) {
+        sendJson(res, 400, { error: "workspace-invite-requires-current-workspace" }, headers);
+        return;
+      }
+      if (inviteType === "workspace" && !roleAtLeast(context.role, "owner")) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      if (inviteType === "account" && !userHasRoleAnywhere(context.user.userId, "owner")) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
       const role = roleOrder[body.role] ? body.role : "viewer";
       const inviteCode = randomShortCode(12, 4);
       const inviteId = randomId("invite");
       state.invitations[inviteId] = {
         inviteId,
-        workspaceId: context.workspaceId,
-        role,
+        type: inviteType,
+        workspaceId: inviteType === "workspace" ? context.workspaceId : "",
+        role: inviteType === "workspace" ? role : "",
         note: clampText(String(body.note || ""), 120),
         codeHash: sha256Hex(normalizeCode(inviteCode)),
         createdAt: nowIso(),
@@ -1677,7 +1737,7 @@ const server = http.createServer(async (req, res) => {
     const revokeInvitationMatch = pathname.match(/^\/api\/admin\/invitations\/([^/]+)\/revoke$/);
     if (req.method === "POST" && revokeInvitationMatch) {
       const context = requireUserSession(req, res, {
-        minRole: "owner",
+        requireWorkspace: false,
         allowUnenrolled: false
       });
       if (!context) {
@@ -1685,6 +1745,14 @@ const server = http.createServer(async (req, res) => {
       }
       const invitation = requireInvitationRecord(revokeInvitationMatch[1], context, res);
       if (!invitation) {
+        return;
+      }
+      if ((invitation.type || "workspace") === "workspace" && (!context.workspaceId || invitation.workspaceId !== context.workspaceId || !roleAtLeast(context.role, "owner"))) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      if ((invitation.type || "workspace") === "account" && !userHasRoleAnywhere(context.user.userId, "owner")) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
         return;
       }
       invitation.revokedAt = nowIso();

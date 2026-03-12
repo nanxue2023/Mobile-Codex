@@ -22,7 +22,8 @@ Mobile Codex 的目标是：在不直接暴露 SSH、完整 IDE 或原始 shell 
 - 支持“短配对码 + 手机批准”的 agent 配对
 - 支持用 passkey 进行日常登录，把 bootstrap token 降级为 owner 恢复入口
 - 支持按 workspace 隔离不同的人、设备或环境
-- 支持通过 invite code 把新用户加入指定 workspace，而不共享 owner 恢复口令
+- 支持通过 account invite 创建独立用户，而不把对方自动加入你当前的 workspace
+- 支持通过 workspace invite 把对方加入指定 workspace 进行协作，而不共享 owner 恢复口令
 - 默认关闭高风险能力
 
 ## 🔐 安全默认值

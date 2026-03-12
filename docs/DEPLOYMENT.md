@@ -9,6 +9,8 @@ Use two machines:
 
 The development server only needs outbound access to the relay. It does not need inbound ports.
 
+The relay can now host multiple isolated workspaces. Agents, tasks, and pairing approvals belong to a workspace, not to a single global admin bucket.
+
 ## Production Layout
 
 Recommended paths:
@@ -45,9 +47,27 @@ Notes:
 
 - The relay init script generates a plaintext `BOOTSTRAP_TOKEN` and prints it once.
 - The relay config stores only the hash, not the plaintext token.
+- The bootstrap token now authenticates as the first owner user. It is no longer the intended daily login path for every person.
 - For passkeys, set `publicOrigin` to the real HTTPS origin and optionally set `auth.passkeys.rpId` explicitly if you terminate TLS on a stable domain.
 - Both init scripts keep `codexExecWrite` disabled by default.
 - The relay init script also sets a pairing command config-path hint used by the web UI.
+
+## Multi-User Model
+
+In production, think in terms of:
+
+- `owner`: manages workspace membership, invites, pairing, and passkeys
+- `operator`: can work inside a workspace but cannot manage membership
+- `viewer`: read-only
+
+Recommended pattern:
+
+1. The first owner logs in with the bootstrap token.
+2. The owner registers a passkey on their phone.
+3. The owner creates one or more workspaces.
+4. Each additional person joins through an invite code.
+5. Each invited user registers their own passkey.
+6. Agents are paired inside the intended workspace, not globally.
 
 ## Deployment Template Generation
 
@@ -172,13 +192,15 @@ Recommended first-run order:
 
 1. Start relay first.
 2. Open the relay URL on your phone.
-3. Log in with `BOOTSTRAP_TOKEN`.
-4. Create a short pair code from the UI.
-5. Run the agent once manually with `--pair-code`.
-6. Approve the pending device from the phone UI.
-7. Confirm the agent appears in the UI.
-8. Stop the manual agent process.
-9. Enable and start the systemd agent service.
+3. Log in as the owner with `BOOTSTRAP_TOKEN`.
+4. Register a passkey on that device.
+5. If this is not the default owner workspace, create or switch to the intended workspace.
+6. Create a short pair code from the UI.
+7. Run the agent once manually with `--pair-code`.
+8. Approve the pending device from the phone UI.
+9. Confirm the agent appears in the current workspace.
+10. Stop the manual agent process.
+11. Enable and start the systemd agent service.
 
 Manual agent pairing example:
 
@@ -192,11 +214,25 @@ After deployment:
 
 1. Verify the HTTPS site loads on phone.
 2. Log in once with `BOOTSTRAP_TOKEN`, register a passkey on your phone, then log out and verify passkey login works.
-3. Verify the agent appears.
-4. Submit `read_log`.
-5. Submit `run_action`.
-6. Submit a read-only `codex_exec`.
-7. Only then consider enabling `codexExecWrite`.
+3. Create a second workspace and an invite, then verify an invited user can join and cannot switch into a workspace they do not belong to.
+4. Verify the agent appears in the intended workspace only.
+5. Submit `read_log`.
+6. Submit `run_action`.
+7. Submit a read-only `codex_exec`.
+8. Only then consider enabling `codexExecWrite`.
+
+## Upgrading An Existing Single-User Install
+
+If you already had a single-user deployment before the multi-user release:
+
+- the old admin is migrated into the first owner user
+- a default workspace named `Primary` is created
+- existing agents and tasks stay in `Primary`
+- old passkeys are attached to that owner
+
+Use the dedicated guide for the full upgrade flow:
+
+- [MIGRATION.md](./MIGRATION.md)
 
 ## Hardening Checklist
 

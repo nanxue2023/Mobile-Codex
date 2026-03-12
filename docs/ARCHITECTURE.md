@@ -8,10 +8,26 @@ Give a phone-friendly control plane for Codex tasks without requiring direct mob
 
 1. The `agent` runs on the server that owns the workspace.
 2. The `agent` only makes outbound requests to the `relay`.
-3. The phone opens the `web` PWA from the relay, uses a passkey or recovery token to create an admin session, and then operates through an `HttpOnly` same-site cookie.
-4. The PWA creates tasks on the relay.
-5. The agent polls for queued tasks, executes locally, then pushes back status, logs, and diff snippets.
-6. The relay persists only task metadata; sensitive task content is kept in memory and can be cached locally on the user's device.
+3. The phone opens the `web` PWA from the relay, uses a passkey or owner recovery token to create a user session, and then operates through an `HttpOnly` same-site cookie.
+4. The session is scoped to a selected workspace.
+5. The PWA creates tasks on the relay inside that workspace.
+6. The agent polls for queued tasks in its workspace, executes locally, then pushes back status, logs, and diff snippets.
+7. The relay persists only task metadata; sensitive task content is kept in memory and can be cached locally on the user's device.
+
+## Multi-User Model
+
+The relay now uses four core concepts:
+
+- `user`: a human identity with one or more passkeys
+- `workspace`: an isolation boundary for agents, tasks, and pairing
+- `membership`: a user's role inside a workspace
+- `invitation`: a short-lived code for joining a workspace
+
+Roles are intentionally simple:
+
+- `owner`
+- `operator`
+- `viewer`
 
 ## Security Boundaries
 
@@ -21,6 +37,7 @@ Give a phone-friendly control plane for Codex tasks without requiring direct mob
 - Actions and log reads are predefined in `agent.local.json`.
 - `codex_exec` write mode is disabled by default on both relay and agent.
 - Relay disk state is intentionally narrower than the UI-visible state.
+- Agents and tasks are isolated by workspace on the relay side.
 
 ## Why This Shape
 

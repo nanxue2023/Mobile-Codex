@@ -4,7 +4,9 @@
 
 Mobile-first remote control for Codex.
 
-Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE, or a raw shell on the public internet. The project is built around three pieces:
+Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE, or a raw shell on the public internet. It now supports true multi-user isolation through workspaces, invites, and per-user passkeys.
+
+The project is built around three pieces:
 
 - `relay`: a public-facing control plane and PWA host
 - `agent`: a private-side worker that stays next to your workspace
@@ -19,7 +21,9 @@ Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE
 - Read predefined log sources by id
 - Pair and revoke agents from the browser
 - Pair agents with a short code plus phone approval instead of long direct-use codes
-- Use passkeys for daily login, keeping the bootstrap token as recovery-only access
+- Use passkeys for daily login, keeping the bootstrap token as owner recovery-only access
+- Create isolated workspaces for different people, devices, or environments
+- Invite users into a workspace without sharing the owner recovery token
 - Keep dangerous capabilities off by default
 
 ## 🔐 Security Defaults
@@ -29,13 +33,14 @@ Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE
 - `codexExecWrite` disabled by default
 - Agent only needs outbound access to the relay
 - Feature flags enforced on both relay and agent
-- Daily admin login uses an `HttpOnly` same-site session cookie instead of a browser-readable token
+- Daily login uses an `HttpOnly` same-site session cookie instead of a browser-readable token
+- Users, workspaces, memberships, agents, pair requests, and tasks are isolated by workspace on the relay
 - Relay disk state stores metadata only; task details can stay on the user's device
 - Codex session previews are sourced on the agent, kept in relay memory only, and may be cached in the browser
 - Session browsing is limited to Codex sessions whose CWD stays under the configured `workspaceRoot`
 - Resume mode defaults to read-only continuation; write-mode resume is blocked
 - Agent tokens live in a dedicated state directory instead of being written back into the config file
-- WebAuthn/passkeys are supported on secure origins; the bootstrap token remains as break-glass recovery
+- WebAuthn/passkeys are per-user on secure origins; the bootstrap token remains as break-glass owner recovery
 
 ## 🏗️ Repo Layout
 
@@ -52,10 +57,11 @@ Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE
 1. Run `npm run init:relay`
 2. Run `npm run init:agent`
 3. Start the relay with `npm run relay:start`
-4. Open the web UI and create a short pair code
-5. Pair the agent with `npm run agent:pair -- --pair-code YOUR_CODE`
-6. Approve the pending device from your phone
-7. Start the agent normally with `npm run agent:start`
+4. Sign in as the owner with the bootstrap token and add a passkey
+5. Open the web UI and create a short pair code inside the target workspace
+6. Pair the agent with `npm run agent:pair -- --pair-code YOUR_CODE`
+7. Approve the pending device from your phone
+8. Start the agent normally with `npm run agent:start`
 
 ### Production
 
@@ -64,7 +70,8 @@ Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE
 3. Generate deployment templates with `npm run scaffold:production`
 4. Copy the generated `systemd` and `Caddy` templates from `deploy/generated/`
 5. Start the relay with `npm run relay:start -- --config /etc/mobile-codex/relay.prod.json`
-6. Open the web UI, create a short pair code, run the suggested pair command on the agent host, then approve the pending device from your phone
+6. Sign in as the owner, add a passkey, and create workspaces or invites if needed
+7. Create a short pair code in the intended workspace, run the suggested pair command on the agent host, then approve the pending device from your phone
 
 Use the detailed tutorial and deployment guide when you want the full manual flow or host-level hardening details.
 
@@ -72,6 +79,7 @@ Use the detailed tutorial and deployment guide when you want the full manual flo
 
 - [Detailed tutorial](./docs/TUTORIAL.md)
 - [Production deployment](./docs/DEPLOYMENT.md)
+- [Single-user to multi-user migration](./docs/MIGRATION.md)
 - [Security model](./docs/SECURITY.md)
 - [Feature flags](./docs/FEATURE_FLAGS.md)
 - [Operations and rollback](./docs/OPERATIONS.md)

@@ -42,6 +42,21 @@
             </form>
             <p class="hint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
           </details>
+          <details id="invite-login-box" class="auth-box">
+            <summary>Join A Workspace</summary>
+            <form id="invite-login-form">
+              <label>
+                <span>Invite Code</span>
+                <input id="invite-code" type="text" autocomplete="off" placeholder="ABCD-EFGH-IJKL">
+              </label>
+              <label>
+                <span>Display Name</span>
+                <input id="invite-display-name" type="text" maxlength="80" placeholder="Your name">
+              </label>
+              <button type="submit">Join With Invite</button>
+            </form>
+            <p class="hint">Use a workspace invite to create your own account and keep agents, tasks, and sessions isolated.</p>
+          </details>
         </article>
       </section>
 
@@ -56,9 +71,14 @@
           </section>
           <section class="utility-card">
             <label class="compact-field">
+              <span>Workspace</span>
+              <select id="workspace-id"></select>
+            </label>
+            <label class="compact-field">
               <span>Agent</span>
               <select id="agent-id" required></select>
             </label>
+            <p id="current-user-line" class="hint">Signed out.</p>
             <div class="toolbar-actions">
               <button id="refresh-button" type="button" class="secondary">Refresh</button>
               <button id="clear-task-cache-button" type="button" class="secondary">Clear Cache</button>
@@ -212,12 +232,66 @@
                 </form>
                 <div id="passkey-list"></div>
               </article>
+
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Workspace Setup</p>
+                    <h3>Spaces</h3>
+                  </div>
+                </div>
+                <form id="workspace-form">
+                  <label>
+                    <span>Create Workspace</span>
+                    <input id="workspace-name" type="text" maxlength="80" placeholder="Production Team">
+                  </label>
+                  <button id="workspace-create-button" type="submit">Create Workspace</button>
+                </form>
+                <form id="join-workspace-form">
+                  <label>
+                    <span>Join With Invite</span>
+                    <input id="join-invite-code" type="text" maxlength="32" placeholder="ABCD-EFGH-IJKL">
+                  </label>
+                  <button id="join-workspace-button" type="submit" class="secondary">Join Existing Workspace</button>
+                </form>
+              </article>
+
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Members</p>
+                    <h3>People And Invites</h3>
+                  </div>
+                </div>
+                <form id="invite-form">
+                  <label>
+                    <span>Role</span>
+                    <select id="invite-role">
+                      <option value="viewer">Viewer</option>
+                      <option value="operator">Operator</option>
+                      <option value="owner">Owner</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Note</span>
+                    <input id="invite-note" type="text" maxlength="120" placeholder="Who this invite is for">
+                  </label>
+                  <label>
+                    <span>TTL Seconds</span>
+                    <input id="invite-ttl" type="number" min="300" max="604800" value="86400">
+                  </label>
+                  <button id="invite-create-button" type="submit">Create Invite</button>
+                </form>
+                <pre id="invite-result" class="result-box"></pre>
+                <div id="member-list"></div>
+                <div id="invite-list"></div>
+              </article>
             </div>
           </section>
         </section>
       </section>
     </main>
 
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.multi.js"></script>
   </body>
 </html>

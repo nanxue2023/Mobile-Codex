@@ -1,3 +1,5 @@
+import "./server-core.js";
+/*
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -1181,3 +1183,4 @@ const server = http.createServer(async (req, res) => {
 server.listen(config.listenPort, config.listenHost, () => {
   console.log(`relay listening on http://${config.listenHost}:${config.listenPort}`);
 });
+*/

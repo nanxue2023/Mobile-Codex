@@ -4,6 +4,8 @@ This guide walks from zero to a working local test setup.
 
 If you want production deployment, read [DEPLOYMENT.md](./DEPLOYMENT.md) after this guide.
 
+If you are upgrading an older single-user deployment, read [MIGRATION.md](./MIGRATION.md) before restarting the relay with the new code.
+
 For production, the shortest path is now:
 
 1. `npm run init:relay -- --mode production`
@@ -17,10 +19,11 @@ You will run:
 
 - one `relay`
 - one `agent`
-- one browser session on your phone or desktop
+- one owner browser session on your phone or desktop
 
 The relay hosts the web UI and brokers messages.  
 The agent runs next to your workspace and executes approved tasks locally.
+The first login becomes the owner of the default workspace. Additional users should join later through invites instead of sharing the owner recovery token.
 
 ## 2. Prerequisites
 
@@ -45,9 +48,11 @@ The easiest path is now:
 1. `npm run init:relay`
 2. `npm run init:agent`
 3. `npm run relay:start`
-4. create a pairing code in the UI
-5. `npm run agent:pair -- --pair-code YOUR_CODE`
-6. later use `npm run agent:start`
+4. log in as the owner with the bootstrap token
+5. register a passkey on your device
+6. create a pairing code in the UI
+7. `npm run agent:pair -- --pair-code YOUR_CODE`
+8. later use `npm run agent:start`
 
 The manual JSON editing steps below are still included so you can understand what the scripts generate.
 

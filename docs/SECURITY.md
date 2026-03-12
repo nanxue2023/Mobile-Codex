@@ -13,10 +13,12 @@ Assume:
 
 - Bootstrap token is stored as SHA-256 hash on the relay.
 - Daily mobile sessions use relay-backed `HttpOnly` same-site cookies instead of browser-readable bearer tokens.
+- Multi-user access is isolated through `users`, `workspaces`, and `memberships`.
+- Agents, tasks, pair requests, and pairings are all bound to a workspace on the relay.
 - WebAuthn/passkey challenges stay in relay memory only and expire quickly.
-- Agent pairing uses short-lived one-time pairing codes.
+- Agent pairing uses short-lived one-time pairing codes plus explicit phone approval inside the target workspace.
 - Agent tokens can be revoked from the web UI.
-- Passkey credentials persist only the public key, credential id, transport hints, and usage counter.
+- Passkey credentials persist only the public key, credential id, transport hints, usage counter, and owning user id.
 - Relay and agent both enforce feature flags.
 - Relay persists only minimal task metadata to disk. Prompt text, task output, diff text, and result bodies are kept out of `state.json`.
 - Task details can be cached locally in the browser on the user's device instead of on the relay.
@@ -29,6 +31,7 @@ Assume:
 - Diff snippets are capped in size before being returned to the phone.
 - Security headers and a restrictive CSP are enabled on the web UI.
 - Login and pairing endpoints are rate-limited.
+- Invited users enter an enrollment-locked state and must register a passkey before they can see workspace contents, submit tasks, or approve pairings.
 
 ## Strong Recommendations
 
@@ -37,6 +40,8 @@ Assume:
 - Store the bootstrap token in a password manager, not in notes or chat.
 - Use a relay domain separate from any production domain.
 - Rotate the bootstrap token and token secret after suspected exposure.
+- Treat the bootstrap token as owner recovery only. Do not share it with additional users.
+- Use workspace invites for every additional person or phone that should not share the owner identity.
 - Keep `runAction` and `readLog` narrowed to the minimum useful set.
 - Keep `codexExecWrite` off until you trust the surrounding controls.
 - Treat the bootstrap token as recovery-only access once you have registered at least one passkey.
@@ -45,12 +50,13 @@ Assume:
 
 These are not implemented in the MVP and should be considered before broader use:
 
-- Multi-user RBAC
 - End-to-end encryption between phone and agent
 - Signed audit export
 - Content scanning for secrets before log or diff return
 - Replay protection beyond token expiry and revocation
 - Per-user encrypted local browser caches
+- Fine-grained per-action approval policies beyond workspace role checks
+- User self-service membership review and removal flows
 
 ## Incident Response
 
@@ -58,7 +64,8 @@ If you suspect compromise:
 
 1. Revoke the affected agent from the UI.
 2. Stop the agent process on the server.
-3. Rotate `bootstrapAdminTokenHash` and `tokenSecret`.
-4. Delete relay state in `data/relay/state.json` after preserving it for analysis.
-5. Re-pair agents with new pairing codes.
-6. Clear local browser storage on any device that cached task details.
+3. Revoke affected passkeys for the impacted user or workspace.
+4. Rotate `bootstrapAdminTokenHash` and `tokenSecret` if owner recovery access may have leaked.
+5. Delete relay state in `data/relay/state.json` only after preserving it for analysis.
+6. Re-pair agents with new pairing codes if agent credentials may have leaked.
+7. Clear local browser storage on any device that cached task details.

@@ -402,6 +402,7 @@ function sanitizeTask(task) {
     rejectedAt: task.rejectedAt || null,
     writeAccess: !!task.writeAccess,
     resumeSessionId: task.resumeSessionId || "",
+    sessionId: task.sessionId || "",
     summary: volatile.summary || "",
     prompt: volatile.prompt || "",
     actionId: task.actionId || "",
@@ -475,14 +476,14 @@ function requireTask(taskId, res) {
 }
 
 function taskNeedsApproval(type) {
-  if (type === "codex_exec") {
+  if (type === "codex_exec" || type === "delete_session") {
     return false;
   }
   return true;
 }
 
 function createTask(body, res) {
-  const allowedTypes = new Set(["codex_exec", "run_action", "read_log"]);
+  const allowedTypes = new Set(["codex_exec", "run_action", "read_log", "delete_session"]);
   if (!allowedTypes.has(body.type)) {
     sendJson(res, 400, { error: "unsupported-task-type" }, headers);
     return;
@@ -497,6 +498,10 @@ function createTask(body, res) {
     return;
   }
   if (body.type === "read_log" && !config.features.readLog) {
+    sendJson(res, 403, { error: "feature-disabled" }, headers);
+    return;
+  }
+  if (body.type === "delete_session" && config.features.deleteSession === false) {
     sendJson(res, 403, { error: "feature-disabled" }, headers);
     return;
   }
@@ -516,6 +521,7 @@ function createTask(body, res) {
   const taskId = randomId("task");
   const createdAt = nowIso();
   const resumeSessionId = body.type === "codex_exec" ? String(body.resumeSessionId || "").slice(0, 120) : "";
+  const sessionId = body.type === "delete_session" ? String(body.sessionId || "").slice(0, 120) : "";
   state.tasks[taskId] = {
     taskId,
     agentId: body.agentId,
@@ -524,6 +530,7 @@ function createTask(body, res) {
     actionId: body.actionId || "",
     logSourceId: body.logSourceId || "",
     resumeSessionId,
+    sessionId,
     cwd: body.cwd || ".",
     writeAccess,
     needsApproval: taskNeedsApproval(body.type),

@@ -182,6 +182,7 @@ Use a local test config like this:
   "features": {
     "pairings": true,
     "codexExec": true,
+    "deleteSession": true,
     "codexExecWrite": false,
     "runAction": true,
     "readLog": true
@@ -226,6 +227,7 @@ Use a local test config like this:
   "maxTaskLogBytes": 12000,
   "features": {
     "codexExec": true,
+    "deleteSession": true,
     "codexExecWrite": false,
     "runAction": true,
     "readLog": true

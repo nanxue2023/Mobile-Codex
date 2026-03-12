@@ -14,6 +14,7 @@ Mobile Codex lets you use Codex from your phone without exposing SSH, a full IDE
 
 - Submit `codex exec` tasks from a phone-friendly web UI
 - Browse recent Codex sessions from the selected agent and continue one safely
+- Delete unwanted Codex sessions from the selected agent
 - Run predefined safe actions by id
 - Read predefined log sources by id
 - Pair and revoke agents from the browser

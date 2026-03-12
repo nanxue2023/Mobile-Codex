@@ -125,6 +125,7 @@ async function main() {
       maxTaskLogBytes: 12000,
       features: {
         codexExec: true,
+        deleteSession: true,
         codexExecWrite: false,
         runAction: true,
         readLog: true

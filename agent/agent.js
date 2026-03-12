@@ -241,6 +241,14 @@ function summarizeSessionText(value, maxChars = 240) {
   return clampText(String(value || "").replace(/\s+/g, " ").trim(), maxChars);
 }
 
+function validateSessionId(value) {
+  const sessionId = String(value || "").trim();
+  if (!/^[A-Za-z0-9._:-]{1,120}$/.test(sessionId)) {
+    throw new Error("invalid-session-id");
+  }
+  return sessionId;
+}
+
 function extractMessageText(role, content) {
   if (!Array.isArray(content)) {
     return "";
@@ -591,6 +599,104 @@ async function runReadLog(task) {
   };
 }
 
+async function lookupSessionForDeletion(sessionId) {
+  const sqlitePath = getCodexStateDbPath();
+  if (!fs.existsSync(sqlitePath)) {
+    throw new Error("codex-state-db-not-found");
+  }
+
+  const safeSessionId = validateSessionId(sessionId);
+  const rows = await querySqliteJson(
+    sqlitePath,
+    [
+      "select",
+      "id,",
+      "rollout_path as rolloutPath,",
+      "cwd,",
+      "title,",
+      "first_user_message as firstUserMessage",
+      "from threads",
+      `where id = '${safeSessionId.replaceAll("'", "''")}'`,
+      "limit 1"
+    ].join(" ")
+  );
+  const row = rows[0];
+  if (!row) {
+    throw new Error("session-not-found");
+  }
+  if (!row.cwd || !isWithinWorkspace(row.cwd)) {
+    throw new Error("session-outside-workspace");
+  }
+  return {
+    sqlitePath,
+    sessionId: safeSessionId,
+    rolloutPath: String(row.rolloutPath || ""),
+    cwd: String(row.cwd || ""),
+    title: summarizeSessionText(row.title || row.firstUserMessage || safeSessionId, 180)
+  };
+}
+
+function pruneEmptySessionParents(targetPath, rootPath) {
+  let current = path.dirname(targetPath);
+  const resolvedRoot = path.resolve(rootPath);
+  while (current.startsWith(`${resolvedRoot}${path.sep}`)) {
+    try {
+      if (fs.readdirSync(current).length > 0) {
+        return;
+      }
+      fs.rmdirSync(current);
+    } catch {
+      return;
+    }
+    current = path.dirname(current);
+  }
+}
+
+async function deleteCodexSession(task) {
+  if (config.features?.deleteSession === false) {
+    throw new Error("delete-session-disabled-locally");
+  }
+
+  const session = await lookupSessionForDeletion(task.sessionId);
+  const sessionsRoot = getCodexSessionsRoot();
+  const rolloutPath = path.resolve(session.rolloutPath || "");
+  const result = await spawnCommand(
+    [
+      "sqlite3",
+      session.sqlitePath,
+      `update threads set archived = 1 where id = '${session.sessionId.replaceAll("'", "''")}';`
+    ],
+    process.cwd(),
+    15,
+    () => {}
+  );
+  if (result.code !== 0) {
+    throw new Error(result.stderr || "session-archive-failed");
+  }
+
+  if (rolloutPath && rolloutPath.startsWith(`${sessionsRoot}${path.sep}`)) {
+    try {
+      fs.unlinkSync(rolloutPath);
+      pruneEmptySessionParents(rolloutPath, sessionsRoot);
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+
+  resetSessionCatalogCache();
+  return {
+    status: "completed",
+    summary: `Deleted session ${session.title}`,
+    result: {
+      sessionId: session.sessionId,
+      deletedAt: nowIso()
+    },
+    error: ""
+  };
+}
+
 async function handleTask(task) {
   try {
     await updateTask(task.taskId, {
@@ -601,6 +707,8 @@ async function handleTask(task) {
     let outcome;
     if (task.type === "codex_exec") {
       outcome = await runCodexExec(task);
+    } else if (task.type === "delete_session") {
+      outcome = await deleteCodexSession(task);
     } else if (task.type === "run_action") {
       outcome = await runAction(task);
     } else if (task.type === "read_log") {

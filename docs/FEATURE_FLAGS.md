@@ -23,6 +23,14 @@ A feature is usable only if both are enabled.
 - Risk if enabled: Codex can inspect workspace content and may perform reads or limited commands depending on sandbox mode
 - Mitigation: keep write mode off, keep workspace narrowly scoped
 
+## `deleteSession`
+
+- Default: `true`
+- Purpose: allow the phone UI to delete Codex sessions that belong to the selected agent workspace
+- Disable when: you want session history to be immutable from mobile
+- Risk if enabled: an authenticated admin can permanently remove local Codex session history for that workspace
+- Mitigation: require explicit UI confirmation, limit deletion to the current workspace, and keep relay/agent auth tight
+
 ## `codexExecWrite`
 
 - Default: `false`

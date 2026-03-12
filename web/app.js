@@ -357,6 +357,7 @@ function taskCard(task) {
       </header>
       ${task.prompt ? `<p class="task-body">${escapeHtml(task.prompt)}</p>` : ""}
       ${task.resumeSessionId ? `<p class="task-body">Session: ${escapeHtml(task.resumeSessionId)}</p>` : ""}
+      ${task.sessionId ? `<p class="task-body">Target Session: ${escapeHtml(task.sessionId)}</p>` : ""}
       ${task.actionId ? `<p class="task-body">Action: ${escapeHtml(task.actionId)}</p>` : ""}
       ${task.logSourceId ? `<p class="task-body">Log: ${escapeHtml(task.logSourceId)}</p>` : ""}
       ${task.summary ? `<p class="task-summary">${escapeHtml(task.summary)}</p>` : ""}
@@ -479,6 +480,7 @@ function sessionCard(session, selected) {
       ${preview || "<p class='hint'>No preview available yet.</p>"}
       <div class="actions">
         <button type="button" data-use-session="${escapeHtml(session.sessionId)}">${selected ? "Selected" : "Continue Here"}</button>
+        <button type="button" class="secondary" data-delete-session="${escapeHtml(session.sessionId)}">Delete</button>
       </div>
     </article>
   `;
@@ -494,6 +496,23 @@ function renderSessionList(agent) {
   sessionList.innerHTML = sessions.length
     ? sessions.map((session) => sessionCard(session, session.sessionId === state.selectedSessionId)).join("")
     : "<p class='hint'>No Codex sessions found for this workspace yet.</p>";
+}
+
+function removeSessionFromLocalState(agentId, sessionId) {
+  if (state.sessionCache[agentId]?.sessions) {
+    state.sessionCache[agentId].sessions = state.sessionCache[agentId].sessions.filter((item) => item.sessionId !== sessionId);
+    persistSessionCache();
+  }
+  if (state.data?.agents) {
+    state.data.agents = state.data.agents.map((agent) =>
+      agent.agentId === agentId
+        ? {
+            ...agent,
+            codexSessions: (agent.codexSessions || []).filter((item) => item.sessionId !== sessionId)
+          }
+        : agent
+    );
+  }
 }
 
 function syncTaskFields() {
@@ -761,14 +780,48 @@ pairRequestsEl.addEventListener("click", async (event) => {
 
 sessionList.addEventListener("click", (event) => {
   const sessionId = event.target.getAttribute("data-use-session");
-  if (!sessionId) {
+  const deleteSessionId = event.target.getAttribute("data-delete-session");
+  if (sessionId) {
+    state.selectedSessionId = sessionId;
+    taskType.value = "codex_exec";
+    syncTaskFields();
+    renderState(state.data || { agents: [], tasks: [] });
+    document.querySelector("#task-prompt").focus();
     return;
   }
-  state.selectedSessionId = sessionId;
-  taskType.value = "codex_exec";
-  syncTaskFields();
-  renderState(state.data || { agents: [], tasks: [] });
-  document.querySelector("#task-prompt").focus();
+  if (!deleteSessionId) {
+    return;
+  }
+  const selectedAgent = findSelectedAgent();
+  const session = findSelectedSession(selectedAgent) && state.selectedSessionId === deleteSessionId
+    ? findSelectedSession(selectedAgent)
+    : (selectedAgent?.codexSessions || []).find((item) => item.sessionId === deleteSessionId);
+  const label = session ? `${session.title} (${session.sessionId})` : deleteSessionId;
+  if (!confirm(`Delete this Codex session from the agent?\n\n${label}\n\nThis cannot be undone.`)) {
+    return;
+  }
+  api("/api/admin/tasks", {
+    method: "POST",
+    body: {
+      agentId: agentSelect.value,
+      type: "delete_session",
+      title: "Delete Session",
+      sessionId: deleteSessionId
+    }
+  })
+    .then(async () => {
+      removeSessionFromLocalState(agentSelect.value, deleteSessionId);
+      if (state.selectedSessionId === deleteSessionId) {
+        clearSelectedSession();
+      }
+      if (state.data) {
+        renderState(state.data);
+      }
+      await refresh();
+    })
+    .catch((error) => {
+      alert(String(error.message || error));
+    });
 });
 
 passkeyList.addEventListener("click", async (event) => {

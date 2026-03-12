@@ -15,6 +15,7 @@ Mobile Codex 的目标是：在不直接暴露 SSH、完整 IDE 或原始 shell 
 ## ✨ 功能
 
 - 通过手机友好的 Web UI 提交 `codex exec` 任务
+- 删除当前 agent 上不需要的 Codex 会话
 - 执行预定义动作
 - 读取预定义日志源
 - 在浏览器中完成 agent 配对与撤销

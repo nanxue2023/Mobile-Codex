@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="theme-color" content="#0d291f">
+    <meta name="theme-color" content="#111111">
     <title>Mobile Codex</title>
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/styles.css">
@@ -11,135 +11,209 @@
   <body>
     <main class="app-shell">
       <section class="hero">
-        <p class="eyebrow">Mobile Remote Control</p>
-        <h1>Mobile Codex</h1>
-        <p class="subhead">Phone-native control plane for Codex tasks, predefined actions, and approved log access.</p>
-      </section>
-
-      <section id="login-panel" class="panel">
-        <h2>Login</h2>
-        <div id="passkey-login-box" class="auth-box">
-          <button id="passkey-login-button" type="button">Continue With Passkey</button>
-          <p id="passkey-login-hint" class="hint">Use the passkey already registered for this relay.</p>
+        <div class="hero-copy">
+          <p class="eyebrow">Mobile Remote Control</p>
+          <h1>Mobile Codex</h1>
+          <p class="subhead">A stripped-back control surface for sessions, tasks, pairing, and security.</p>
         </div>
-        <details id="recovery-login-box" class="auth-box">
-          <summary>Use Recovery Token Instead</summary>
-          <form id="login-form">
-            <label>
-              <span>Bootstrap Token</span>
-              <input id="bootstrap-token" type="password" autocomplete="off">
-            </label>
-            <button type="submit">Unlock With Recovery Token</button>
-          </form>
-          <p class="hint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
-        </details>
+        <div class="hero-mark">
+          <span></span>
+          <span></span>
+        </div>
       </section>
 
-      <section id="dashboard" class="hidden">
-        <section class="panel toolbar">
-          <div>
-            <h2>Agents</h2>
-            <p id="status-line" class="hint">Connecting…</p>
+      <section id="login-panel" class="auth-screen">
+        <article class="auth-card">
+          <p class="eyebrow">Sign In</p>
+          <h2>Use the relay without exposing the workstation</h2>
+          <p class="hint">Passkeys are the default. Recovery token access stays available for first-time setup and break-glass recovery.</p>
+          <div id="passkey-login-box" class="auth-box">
+            <button id="passkey-login-button" type="button">Continue With Passkey</button>
+            <p id="passkey-login-hint" class="hint">Use the passkey already registered for this relay.</p>
           </div>
-          <div class="toolbar-actions">
-            <button id="refresh-button" type="button">Refresh</button>
-            <button id="clear-task-cache-button" type="button" class="secondary">Clear Local Cache</button>
-            <button id="logout-button" type="button" class="secondary">Logout</button>
-          </div>
-        </section>
+          <details id="recovery-login-box" class="auth-box">
+            <summary>Use Recovery Token Instead</summary>
+            <form id="login-form">
+              <label>
+                <span>Bootstrap Token</span>
+                <input id="bootstrap-token" type="password" autocomplete="off">
+              </label>
+              <button type="submit">Unlock With Recovery Token</button>
+            </form>
+            <p class="hint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
+          </details>
+        </article>
+      </section>
 
-        <section class="panel">
-          <h2>Security</h2>
-          <p id="auth-status-line" class="hint">Checking passkey status…</p>
-          <form id="passkey-form">
-            <label>
-              <span>New Passkey Label</span>
-              <input id="passkey-label" type="text" maxlength="80" placeholder="My iPhone">
-            </label>
-            <button id="passkey-register-button" type="submit">Add This Device As A Passkey</button>
-          </form>
-          <div id="passkey-list"></div>
-        </section>
-
-        <section class="panel">
-          <h2>Pair Agent</h2>
-          <form id="pair-form">
-            <label>
-              <span>Note</span>
-              <input id="pair-note" type="text" maxlength="120" placeholder="Server or environment name">
-            </label>
-            <label>
-              <span>TTL Seconds</span>
-              <input id="pair-ttl" type="number" min="60" max="1800" value="300">
-            </label>
-            <button type="submit">Create Short Pair Code</button>
-          </form>
-          <pre id="pair-result" class="result-box"></pre>
-          <div id="pair-command-box" class="hidden">
-            <label>
-              <span>Suggested Pair Command</span>
-              <textarea id="pair-command" rows="3" readonly></textarea>
-            </label>
-            <button id="copy-pair-command" type="button">Copy Pair Command</button>
-          </div>
-          <div id="pair-requests"></div>
-        </section>
-
-        <section class="panel">
-          <h2>New Task</h2>
-          <div id="resume-session-banner" class="session-banner hidden">
+      <section id="dashboard" class="workspace-shell hidden">
+        <header class="topbar">
+          <section class="masthead-card">
             <div>
-              <strong>Continuing Session</strong>
-              <p id="resume-session-label" class="hint"></p>
+              <p class="eyebrow">Control Plane</p>
+              <h2>Current Workspace</h2>
             </div>
-            <button id="clear-session-selection" type="button" class="secondary">Use New Session</button>
-          </div>
-          <form id="task-form">
-            <label>
+            <p id="status-line" class="hint">Connecting…</p>
+          </section>
+          <section class="utility-card">
+            <label class="compact-field">
               <span>Agent</span>
               <select id="agent-id" required></select>
             </label>
-            <label>
-              <span>Type</span>
-              <select id="task-type">
-                <option value="codex_exec">Codex Task</option>
-                <option value="run_action">Run Action</option>
-                <option value="read_log">Read Log</option>
-              </select>
-            </label>
-            <label id="codex-prompt-row">
-              <span>Prompt</span>
-              <textarea id="task-prompt" rows="5" placeholder="Describe the coding task you want Codex to perform."></textarea>
-            </label>
-            <label id="cwd-row">
-              <span>Relative CWD</span>
-              <input id="task-cwd" type="text" value=".">
-            </label>
-            <label id="write-row" class="switch-row">
-              <span>Allow Workspace Writes</span>
-              <input id="task-write" type="checkbox">
-            </label>
-            <label id="action-row" class="hidden">
-              <span>Action</span>
-              <select id="task-action-id"></select>
-            </label>
-            <label id="log-row" class="hidden">
-              <span>Log Source</span>
-              <select id="task-log-source-id"></select>
-            </label>
-            <button type="submit">Submit Task</button>
-          </form>
-        </section>
+            <div class="toolbar-actions">
+              <button id="refresh-button" type="button" class="secondary">Refresh</button>
+              <button id="clear-task-cache-button" type="button" class="secondary">Clear Cache</button>
+              <button id="logout-button" type="button" class="secondary">Logout</button>
+            </div>
+          </section>
+        </header>
 
-        <section class="panel">
-          <h2>Codex Sessions</h2>
-          <p class="hint">Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.</p>
-          <div id="session-list"></div>
-        </section>
+        <nav id="view-nav" class="view-tabs" aria-label="Sections">
+          <button type="button" class="view-tab active" data-view-target="workspace">Workspace</button>
+          <button type="button" class="view-tab" data-view-target="sessions">Sessions</button>
+          <button type="button" class="view-tab" data-view-target="agents">Agents</button>
+          <button type="button" class="view-tab" data-view-target="security">Security</button>
+        </nav>
 
-        <section class="panel">
-          <h2>Tasks</h2>
-          <div id="tasks"></div>
+        <section class="view-stage">
+          <section class="view-panel active" data-view-panel="workspace">
+            <div class="view-stack">
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Compose</p>
+                    <h3>New Task</h3>
+                  </div>
+                </div>
+                <div id="resume-session-banner" class="session-banner hidden">
+                  <div>
+                    <strong>Continuing Session</strong>
+                    <p id="resume-session-label" class="hint"></p>
+                  </div>
+                  <button id="clear-session-selection" type="button" class="secondary">Use New Session</button>
+                </div>
+                <form id="task-form">
+                  <label>
+                    <span>Type</span>
+                    <select id="task-type">
+                      <option value="codex_exec">Codex Task</option>
+                      <option value="run_action">Run Action</option>
+                      <option value="read_log">Read Log</option>
+                    </select>
+                  </label>
+                  <label id="codex-prompt-row">
+                    <span>Prompt</span>
+                    <textarea id="task-prompt" rows="6" placeholder="Describe the coding task you want Codex to perform."></textarea>
+                  </label>
+                  <label id="cwd-row">
+                    <span>Relative CWD</span>
+                    <input id="task-cwd" type="text" value=".">
+                  </label>
+                  <label id="write-row" class="switch-row">
+                    <span>Allow Workspace Writes</span>
+                    <input id="task-write" type="checkbox">
+                  </label>
+                  <label id="action-row" class="hidden">
+                    <span>Action</span>
+                    <select id="task-action-id"></select>
+                  </label>
+                  <label id="log-row" class="hidden">
+                    <span>Log Source</span>
+                    <select id="task-log-source-id"></select>
+                  </label>
+                  <button type="submit">Submit Task</button>
+                </form>
+              </article>
+
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">History</p>
+                    <h3>Recent Tasks</h3>
+                  </div>
+                </div>
+                <div id="tasks"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="view-panel" data-view-panel="sessions">
+            <div class="view-stack">
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Session Control</p>
+                    <h3>Codex Sessions</h3>
+                  </div>
+                  <p class="hint">Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.</p>
+                </div>
+                <div id="session-list"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="view-panel" data-view-panel="agents">
+            <div class="view-stack">
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Provisioning</p>
+                    <h3>Pair Agent</h3>
+                  </div>
+                </div>
+                <form id="pair-form">
+                  <label>
+                    <span>Note</span>
+                    <input id="pair-note" type="text" maxlength="120" placeholder="Server or environment name">
+                  </label>
+                  <label>
+                    <span>TTL Seconds</span>
+                    <input id="pair-ttl" type="number" min="60" max="1800" value="300">
+                  </label>
+                  <button type="submit">Create Short Pair Code</button>
+                </form>
+                <pre id="pair-result" class="result-box"></pre>
+                <div id="pair-command-box" class="hidden">
+                  <label>
+                    <span>Suggested Pair Command</span>
+                    <textarea id="pair-command" rows="3" readonly></textarea>
+                  </label>
+                  <button id="copy-pair-command" type="button" class="secondary">Copy Pair Command</button>
+                </div>
+              </article>
+
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Approvals</p>
+                    <h3>Pending Devices</h3>
+                  </div>
+                </div>
+                <div id="pair-requests"></div>
+              </article>
+            </div>
+          </section>
+
+          <section class="view-panel" data-view-panel="security">
+            <div class="view-stack">
+              <article class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Access</p>
+                    <h3>Security</h3>
+                  </div>
+                  <p id="auth-status-line" class="hint">Checking passkey status…</p>
+                </div>
+                <form id="passkey-form">
+                  <label>
+                    <span>New Passkey Label</span>
+                    <input id="passkey-label" type="text" maxlength="80" placeholder="My iPhone">
+                  </label>
+                  <button id="passkey-register-button" type="submit">Add This Device As A Passkey</button>
+                </form>
+                <div id="passkey-list"></div>
+              </article>
+            </div>
+          </section>
         </section>
       </section>
     </main>

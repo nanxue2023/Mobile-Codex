@@ -8,11 +8,15 @@ const state = {
   pollTimer: null,
   taskCache: loadTaskCache(),
   sessionCache: loadSessionCache(),
-  selectedSessionId: ""
+  selectedSessionId: "",
+  activeView: localStorage.getItem("mobileCodexActiveView") || "workspace"
 };
 
 const loginPanel = document.querySelector("#login-panel");
 const dashboard = document.querySelector("#dashboard");
+const viewNav = document.querySelector("#view-nav");
+const viewTabs = Array.from(document.querySelectorAll("[data-view-target]"));
+const viewPanels = Array.from(document.querySelectorAll("[data-view-panel]"));
 const loginForm = document.querySelector("#login-form");
 const passkeyForm = document.querySelector("#passkey-form");
 const taskForm = document.querySelector("#task-form");
@@ -89,6 +93,18 @@ function persistSessionCache() {
     .slice(0, 20);
   state.sessionCache = Object.fromEntries(entries);
   localStorage.setItem(sessionCacheKey, JSON.stringify(state.sessionCache));
+}
+
+function setActiveView(viewName) {
+  const nextView = viewPanels.some((panel) => panel.dataset.viewPanel === viewName) ? viewName : "workspace";
+  state.activeView = nextView;
+  localStorage.setItem("mobileCodexActiveView", nextView);
+  for (const tab of viewTabs) {
+    tab.classList.toggle("active", tab.dataset.viewTarget === nextView);
+  }
+  for (const panel of viewPanels) {
+    panel.classList.toggle("active", panel.dataset.viewPanel === nextView);
+  }
 }
 
 function webauthnAvailable() {
@@ -316,6 +332,9 @@ function buildPairCommand(pairingCode) {
 function showDashboard(visible) {
   loginPanel.classList.toggle("hidden", visible);
   dashboard.classList.toggle("hidden", !visible);
+  if (visible) {
+    setActiveView(state.activeView);
+  }
 }
 
 async function api(path, options = {}) {
@@ -656,6 +675,14 @@ passkeyForm.addEventListener("submit", async (event) => {
   }
 });
 
+viewNav.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-view-target]");
+  if (!button) {
+    return;
+  }
+  setActiveView(button.dataset.viewTarget);
+});
+
 taskType.addEventListener("change", syncTaskFields);
 agentSelect.addEventListener("change", () => {
   clearSelectedSession();
@@ -699,6 +726,7 @@ taskForm.addEventListener("submit", async (event) => {
 pairForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   try {
+    setActiveView("agents");
     const body = await api("/api/admin/pairings", {
       method: "POST",
       body: {
@@ -784,6 +812,7 @@ sessionList.addEventListener("click", (event) => {
   if (sessionId) {
     state.selectedSessionId = sessionId;
     taskType.value = "codex_exec";
+    setActiveView("workspace");
     syncTaskFields();
     renderState(state.data || { agents: [], tasks: [] });
     document.querySelector("#task-prompt").focus();
@@ -843,6 +872,7 @@ passkeyList.addEventListener("click", async (event) => {
 });
 
 syncTaskFields();
+setActiveView(state.activeView);
 
 showDashboard(false);
 refreshAuthStatus()

@@ -16,9 +16,15 @@
           <h1>Mobile Codex</h1>
           <p class="subhead">A stripped-back control surface for sessions, tasks, pairing, and security.</p>
         </div>
-        <div class="hero-mark">
-          <span></span>
-          <span></span>
+        <div class="hero-tools">
+          <div class="locale-switch" role="group" aria-label="Language">
+            <button id="lang-en" type="button" class="locale-button active">EN</button>
+            <button id="lang-zh" type="button" class="locale-button">中文</button>
+          </div>
+          <div class="hero-mark">
+            <span></span>
+            <span></span>
+          </div>
         </div>
       </section>
 
@@ -56,6 +62,17 @@
               <button type="submit">Join With Invite</button>
             </form>
             <p class="hint">An account invite creates your own user without joining someone else's workspace. A workspace invite lets you collaborate inside the current workspace.</p>
+          </details>
+          <details id="user-recovery-box" class="auth-box">
+            <summary>Use A User Recovery Code</summary>
+            <form id="user-recovery-form">
+              <label>
+                <span>Recovery Code</span>
+                <input id="user-recovery-code" type="text" autocomplete="off" placeholder="ABCD-EFGH-IJKL">
+              </label>
+              <button type="submit">Continue With Recovery Code</button>
+            </form>
+            <p class="hint">If your invite was already used but you lost the session before adding a passkey, ask the relay owner for a user recovery code.</p>
           </details>
         </article>
       </section>
@@ -254,6 +271,7 @@
                   </label>
                   <button id="join-workspace-button" type="submit" class="secondary">Join Existing Workspace</button>
                 </form>
+                <p id="join-workspace-hint" class="hint">Use this after you already have an account and want to collaborate inside another workspace.</p>
               </article>
 
               <article class="panel section-panel">
@@ -271,6 +289,7 @@
                       <option value="workspace">Workspace Invite</option>
                     </select>
                   </label>
+                  <p id="invite-type-summary" class="hint">Account invites create a standalone user. Workspace invites add someone to the current workspace.</p>
                   <label>
                     <span>Role</span>
                     <select id="invite-role">
@@ -292,6 +311,18 @@
                 <pre id="invite-result" class="result-box"></pre>
                 <div id="member-list"></div>
                 <div id="invite-list"></div>
+              </article>
+
+              <article id="relay-users-panel" class="panel section-panel">
+                <div class="section-head">
+                  <div>
+                    <p class="eyebrow">Relay Users</p>
+                    <h3>Users</h3>
+                  </div>
+                  <p id="relay-users-hint" class="hint">Only relay owners can manage global users, recovery codes, and membership cleanup.</p>
+                </div>
+                <pre id="user-admin-result" class="result-box"></pre>
+                <div id="user-list"></div>
               </article>
             </div>
           </section>

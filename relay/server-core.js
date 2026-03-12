@@ -54,18 +54,20 @@ const adminSessionCookie = {
 ensureDir(dataDir);
 
 const state = loadJson(statePath, {
-  version: 3,
+  version: 4,
   createdAt: nowIso(),
   users: {},
   workspaces: {},
   memberships: {},
   invitations: {},
+  recoveryCodes: {},
   pairings: {},
   pairRequests: {},
   agents: {},
   tasks: {},
   auth: {
     bootstrapUserId: "",
+    adminUserIds: [],
     passkeys: [],
     sessions: []
   }
@@ -156,6 +158,14 @@ function passkeysForUser(userId) {
   return state.auth.passkeys.filter((passkey) => passkey.userId === userId);
 }
 
+function isRelayOwner(userId) {
+  const normalized = String(userId || "");
+  if (!normalized) {
+    return false;
+  }
+  return normalized === state.auth.bootstrapUserId || state.auth.adminUserIds.includes(normalized);
+}
+
 function ensureBootstrapWorkspace() {
   const now = nowIso();
   let bootstrapUserId = String(state.auth.bootstrapUserId || "").trim();
@@ -189,22 +199,30 @@ function ensureBootstrapWorkspace() {
 
 function normalizeLoadedState() {
   const now = nowIso();
-  state.version = 3;
+  state.version = 4;
   state.createdAt ||= now;
   state.users ||= {};
   state.workspaces ||= {};
   state.memberships ||= {};
   state.invitations ||= {};
+  state.recoveryCodes ||= {};
   state.pairings ||= {};
   state.pairRequests ||= {};
   state.agents ||= {};
   state.tasks ||= {};
   state.auth ||= {};
   state.auth.bootstrapUserId ||= "";
+  state.auth.adminUserIds = Array.isArray(state.auth.adminUserIds)
+    ? state.auth.adminUserIds.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
   state.auth.passkeys = Array.isArray(state.auth.passkeys) ? state.auth.passkeys : [];
   state.auth.sessions = Array.isArray(state.auth.sessions) ? state.auth.sessions : [];
 
   const defaultWorkspaceId = ensureBootstrapWorkspace();
+  if (!state.auth.adminUserIds.includes(state.auth.bootstrapUserId)) {
+    state.auth.adminUserIds.unshift(state.auth.bootstrapUserId);
+  }
+  state.auth.adminUserIds = Array.from(new Set(state.auth.adminUserIds)).filter((userId) => !!state.users[userId]);
 
   for (const user of Object.values(state.users)) {
     user.userHandle ||= base64UrlEncode(randomToken(18));
@@ -257,6 +275,16 @@ function normalizeLoadedState() {
     invitation.usedAt ||= null;
     invitation.revokedAt ||= null;
     invitation.createdByUserId ||= state.auth.bootstrapUserId;
+  }
+
+  for (const recovery of Object.values(state.recoveryCodes)) {
+    recovery.userId = state.users[recovery.userId] ? recovery.userId : "";
+    recovery.note = clampText(String(recovery.note || ""), 120);
+    recovery.createdAt ||= now;
+    recovery.expiresAt ||= futureIso(3600);
+    recovery.usedAt ||= null;
+    recovery.revokedAt ||= null;
+    recovery.createdByUserId ||= state.auth.bootstrapUserId;
   }
 
   for (const pairing of Object.values(state.pairings)) {
@@ -350,6 +378,16 @@ function cleanupState() {
     const oldTerminal = (invitation.usedAt || invitation.revokedAt) && Number.isFinite(terminalAt) && terminalAt <= now - 24 * 60 * 60 * 1000;
     if (expired || oldTerminal) {
       delete state.invitations[inviteId];
+    }
+  }
+
+  for (const [recoveryId, recovery] of Object.entries(state.recoveryCodes)) {
+    const expiresAt = Date.parse(recovery.expiresAt || "");
+    const terminalAt = Date.parse(recovery.usedAt || recovery.revokedAt || "");
+    const expired = Number.isFinite(expiresAt) && expiresAt <= now;
+    const oldTerminal = (recovery.usedAt || recovery.revokedAt) && Number.isFinite(terminalAt) && terminalAt <= now - 24 * 60 * 60 * 1000;
+    if (expired || oldTerminal || !recovery.userId || !state.users[recovery.userId]) {
+      delete state.recoveryCodes[recoveryId];
     }
   }
 
@@ -456,6 +494,37 @@ function revokeUserSession(sessionToken) {
   }
 }
 
+function revokeSessionsForUser(userId) {
+  const before = state.auth.sessions.length;
+  state.auth.sessions = state.auth.sessions.filter((item) => item.userId !== userId);
+  if (state.auth.sessions.length !== before) {
+    persistState();
+  }
+  return before - state.auth.sessions.length;
+}
+
+function activeSessionCountForUser(userId) {
+  const now = Date.now();
+  return state.auth.sessions.filter((session) => session.userId === userId && Date.parse(session.expiresAt || "") > now).length;
+}
+
+function activeRecoveryCodesForUser(userId) {
+  const now = Date.now();
+  return Object.values(state.recoveryCodes)
+    .filter(
+      (recovery) =>
+        recovery.userId === userId &&
+        !recovery.usedAt &&
+        !recovery.revokedAt &&
+        Date.parse(recovery.expiresAt || "") > now
+    )
+    .sort((left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""));
+}
+
+function latestActiveRecoveryForUser(userId) {
+  return activeRecoveryCodesForUser(userId)[0] || null;
+}
+
 function parseBearer(req) {
   const header = req.headers.authorization || "";
   if (!header.startsWith("Bearer ")) {
@@ -556,7 +625,8 @@ function buildPermissions(role, needsPasskeyEnrollment, hasWorkspaceMembership) 
       manageMembers: false,
       createWorkspaces: false,
       createAccountInvites: false,
-      managePasskeys: true
+      managePasskeys: true,
+      manageRelayUsers: false
     };
   }
   return {
@@ -569,7 +639,8 @@ function buildPermissions(role, needsPasskeyEnrollment, hasWorkspaceMembership) 
     manageMembers: !!hasWorkspaceMembership && roleAtLeast(role, "owner"),
     createWorkspaces: true,
     createAccountInvites: false,
-    managePasskeys: true
+    managePasskeys: true,
+    manageRelayUsers: false
   };
 }
 
@@ -584,7 +655,8 @@ function emptyPermissions() {
     manageMembers: false,
     createWorkspaces: false,
     createAccountInvites: false,
-    managePasskeys: false
+    managePasskeys: false,
+    manageRelayUsers: false
   };
 }
 
@@ -614,6 +686,7 @@ function summarizePasskey(passkey) {
 
 function sanitizeWorkspaceMembership(item) {
   return {
+    membershipId: item.membership.membershipId,
     workspaceId: item.workspace.workspaceId,
     name: item.workspace.name,
     role: item.membership.role,
@@ -648,6 +721,37 @@ function sanitizeInvitation(invitation) {
   };
 }
 
+function sanitizeRecovery(recovery) {
+  return {
+    recoveryId: recovery.recoveryId,
+    userId: recovery.userId,
+    note: recovery.note || "",
+    createdAt: recovery.createdAt,
+    expiresAt: recovery.expiresAt,
+    usedAt: recovery.usedAt || null,
+    revokedAt: recovery.revokedAt || null,
+    createdByDisplayName: state.users[recovery.createdByUserId]?.displayName || "Unknown"
+  };
+}
+
+function sanitizeManagedUser(user) {
+  const memberships = listUserWorkspaceMemberships(user.userId).map(sanitizeWorkspaceMembership);
+  const latestRecovery = latestActiveRecoveryForUser(user.userId);
+  return {
+    userId: user.userId,
+    displayName: user.displayName,
+    createdAt: user.createdAt,
+    disabledAt: user.disabledAt || null,
+    isRelayOwner: isRelayOwner(user.userId),
+    passkeyCount: passkeysForUser(user.userId).length,
+    activeSessionCount: activeSessionCountForUser(user.userId),
+    activeRecovery: latestRecovery ? sanitizeRecovery(latestRecovery) : null,
+    lastWorkspaceId: user.lastWorkspaceId || "",
+    lastWorkspaceName: user.lastWorkspaceId ? state.workspaces[user.lastWorkspaceId]?.name || "" : "",
+    memberships
+  };
+}
+
 function resolveSessionContext(session) {
   const user = state.users[session.userId];
   if (!user || user.disabledAt) {
@@ -666,7 +770,8 @@ function resolveSessionContext(session) {
     role,
     permissions: {
       ...buildPermissions(role, !!session.needsPasskeyEnrollment, !!membership),
-      createAccountInvites: !session.needsPasskeyEnrollment && userHasRoleAnywhere(user.userId, "owner")
+      createAccountInvites: !session.needsPasskeyEnrollment && isRelayOwner(user.userId),
+      manageRelayUsers: !session.needsPasskeyEnrollment && isRelayOwner(user.userId)
     }
   };
 }
@@ -681,6 +786,7 @@ function authSummary(context = null) {
     rpId: passkeyConfig.rpId,
     sessionCookieName: adminSessionCookie.name,
     currentUser: context ? sanitizeUser(context.user) : null,
+    isRelayOwner: context ? isRelayOwner(context.user.userId) : false,
     currentWorkspaceId: context?.workspaceId || "",
     currentRole: context?.role || "",
     workspaces: context ? listUserWorkspaceMemberships(context.user.userId).map(sanitizeWorkspaceMembership) : [],
@@ -886,6 +992,11 @@ function listState(context) {
           .sort((left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""))
           .map(sanitizeInvitation)
       : [],
+    users: !enrollmentLocked && context.permissions.manageRelayUsers
+      ? Object.values(state.users)
+          .sort((left, right) => String(left.displayName || "").localeCompare(String(right.displayName || "")))
+          .map(sanitizeManagedUser)
+      : [],
     pendingPairRequests: enrollmentLocked
       ? []
       : Object.values(state.pairRequests)
@@ -976,6 +1087,34 @@ function requireInvitationRecord(inviteId, context, res) {
     return null;
   }
   return invitation;
+}
+
+function requireManagedUser(userId, res) {
+  const user = state.users[String(userId || "")];
+  if (!user) {
+    sendJson(res, 404, { error: "user-not-found" }, headers);
+    return null;
+  }
+  return user;
+}
+
+function requireMembershipRecord(membershipId, res) {
+  const membership = state.memberships[String(membershipId || "")];
+  if (!membership || membership.revokedAt) {
+    sendJson(res, 404, { error: "membership-not-found" }, headers);
+    return null;
+  }
+  const user = state.users[membership.userId];
+  const workspace = state.workspaces[membership.workspaceId];
+  if (!user || !workspace || workspace.archivedAt) {
+    sendJson(res, 404, { error: "membership-not-found" }, headers);
+    return null;
+  }
+  return membership;
+}
+
+function activeOwnerCountForWorkspace(workspaceId) {
+  return activeMemberships().filter((membership) => membership.workspaceId === workspaceId && membership.role === "owner").length;
 }
 
 function taskNeedsApproval(type) {
@@ -1148,6 +1287,42 @@ function findActiveInvitationByCode(code) {
   );
 }
 
+function findActiveRecoveryByCode(code) {
+  const normalized = normalizeCode(code);
+  return Object.values(state.recoveryCodes).find(
+    (recovery) =>
+      recovery.userId &&
+      !recovery.usedAt &&
+      !recovery.revokedAt &&
+      Date.parse(recovery.expiresAt || "") > Date.now() &&
+      recovery.codeHash === sha256Hex(normalized)
+  );
+}
+
+function issueRecoveryCodeForUser(userId, createdByUserId, ttlSec, note = "") {
+  for (const recovery of activeRecoveryCodesForUser(userId)) {
+    recovery.revokedAt = nowIso();
+  }
+  const recoveryCode = randomShortCode(12, 4);
+  const recoveryId = randomId("recovery");
+  state.recoveryCodes[recoveryId] = {
+    recoveryId,
+    userId,
+    note: clampText(String(note || ""), 120),
+    codeHash: sha256Hex(normalizeCode(recoveryCode)),
+    createdAt: nowIso(),
+    expiresAt: futureIso(Math.max(300, Math.min(Number(ttlSec || 3600), 7 * 24 * 60 * 60))),
+    usedAt: null,
+    revokedAt: null,
+    createdByUserId
+  };
+  persistState();
+  return {
+    recoveryCode,
+    recovery: sanitizeRecovery(state.recoveryCodes[recoveryId])
+  };
+}
+
 function visibleInvitationsForContext(context) {
   const activeInvitations = Object.values(state.invitations).filter(
     (invitation) => !invitation.usedAt && !invitation.revokedAt && Date.parse(invitation.expiresAt || "") > Date.now()
@@ -1158,7 +1333,7 @@ function visibleInvitationsForContext(context) {
           (invitation) => (invitation.type || "workspace") === "workspace" && invitation.workspaceId === context.workspaceId
         )
       : [];
-  const accountInvitations = userHasRoleAnywhere(context.user.userId, "owner")
+  const accountInvitations = isRelayOwner(context.user.userId)
     ? activeInvitations.filter((invitation) => (invitation.type || "workspace") === "account")
     : [];
 
@@ -1351,6 +1526,52 @@ const server = http.createServer(async (req, res) => {
         {
           ...headers,
           "set-cookie": adminSessionCookieHeader(newSessionToken)
+        }
+      );
+      return;
+    }
+
+    if (req.method === "POST" && pathname === "/api/auth/recovery/redeem") {
+      const ip = req.socket.remoteAddress || "unknown";
+      if (!rateLimit(`recovery-redeem:${ip}`, config.maxLoginAttemptsPerMinute || 10)) {
+        sendJson(res, 429, { error: "rate-limited" }, headers);
+        return;
+      }
+      const existingSessionToken = parseCookies(req)[adminSessionCookie.name] || "";
+      if (existingSessionToken && findUserSession(existingSessionToken)) {
+        sendJson(res, 409, { error: "already-authenticated" }, headers);
+        return;
+      }
+      const body = await readJsonBody(req, 4096);
+      const recovery = findActiveRecoveryByCode(body.recoveryCode || "");
+      if (!recovery) {
+        sendJson(res, 401, { error: "invalid-recovery-code" }, headers);
+        return;
+      }
+      const user = state.users[recovery.userId];
+      if (!user || user.disabledAt) {
+        sendJson(res, 403, { error: "user-disabled-or-missing" }, headers);
+        return;
+      }
+      recovery.usedAt = nowIso();
+      persistState();
+      const workspaceId =
+        (user.lastWorkspaceId && getMembership(user.userId, user.lastWorkspaceId) ? user.lastWorkspaceId : "") ||
+        firstWorkspaceIdForUser(user.userId) ||
+        "";
+      const sessionToken = issueUserSession(user.userId, {
+        workspaceId,
+        recovery: true,
+        needsPasskeyEnrollment: !!passkeyConfig.enabled
+      });
+      const nextContext = resolveSessionContext(findUserSession(sessionToken));
+      sendJson(
+        res,
+        200,
+        { ok: true, auth: authSummary(nextContext) },
+        {
+          ...headers,
+          "set-cookie": adminSessionCookieHeader(sessionToken)
         }
       );
       return;
@@ -1700,7 +1921,7 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 403, { error: "insufficient-role" }, headers);
         return;
       }
-      if (inviteType === "account" && !userHasRoleAnywhere(context.user.userId, "owner")) {
+      if (inviteType === "account" && !isRelayOwner(context.user.userId)) {
         sendJson(res, 403, { error: "insufficient-role" }, headers);
         return;
       }
@@ -1751,13 +1972,199 @@ const server = http.createServer(async (req, res) => {
         sendJson(res, 403, { error: "insufficient-role" }, headers);
         return;
       }
-      if ((invitation.type || "workspace") === "account" && !userHasRoleAnywhere(context.user.userId, "owner")) {
+      if ((invitation.type || "workspace") === "account" && !isRelayOwner(context.user.userId)) {
         sendJson(res, 403, { error: "insufficient-role" }, headers);
         return;
       }
       invitation.revokedAt = nowIso();
       persistState();
       sendJson(res, 200, { ok: true, invitation: sanitizeInvitation(invitation) }, headers);
+      return;
+    }
+
+    const disableUserMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/disable$/);
+    if (req.method === "POST" && disableUserMatch) {
+      const context = requireUserSession(req, res, {
+        requireWorkspace: false,
+        allowUnenrolled: false
+      });
+      if (!context) {
+        return;
+      }
+      if (!context.permissions.manageRelayUsers) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      const user = requireManagedUser(decodeURIComponent(disableUserMatch[1]), res);
+      if (!user) {
+        return;
+      }
+      if (isRelayOwner(user.userId)) {
+        sendJson(res, 409, { error: "relay-owner-protected" }, headers);
+        return;
+      }
+      user.disabledAt = nowIso();
+      revokeSessionsForUser(user.userId);
+      persistState();
+      sendJson(res, 200, { ok: true, user: sanitizeManagedUser(user) }, headers);
+      return;
+    }
+
+    const enableUserMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/enable$/);
+    if (req.method === "POST" && enableUserMatch) {
+      const context = requireUserSession(req, res, {
+        requireWorkspace: false,
+        allowUnenrolled: false
+      });
+      if (!context) {
+        return;
+      }
+      if (!context.permissions.manageRelayUsers) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      const user = requireManagedUser(decodeURIComponent(enableUserMatch[1]), res);
+      if (!user) {
+        return;
+      }
+      user.disabledAt = null;
+      persistState();
+      sendJson(res, 200, { ok: true, user: sanitizeManagedUser(user) }, headers);
+      return;
+    }
+
+    const deleteUserMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/delete$/);
+    if (req.method === "POST" && deleteUserMatch) {
+      const context = requireUserSession(req, res, {
+        requireWorkspace: false,
+        allowUnenrolled: false
+      });
+      if (!context) {
+        return;
+      }
+      if (!context.permissions.manageRelayUsers) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      const user = requireManagedUser(decodeURIComponent(deleteUserMatch[1]), res);
+      if (!user) {
+        return;
+      }
+      if (isRelayOwner(user.userId)) {
+        sendJson(res, 409, { error: "relay-owner-protected" }, headers);
+        return;
+      }
+      if (listUserWorkspaceMemberships(user.userId).length > 0) {
+        sendJson(res, 409, { error: "user-still-has-memberships" }, headers);
+        return;
+      }
+      if (passkeysForUser(user.userId).length > 0) {
+        sendJson(res, 409, { error: "user-still-has-passkeys" }, headers);
+        return;
+      }
+      revokeSessionsForUser(user.userId);
+      for (const [recoveryId, recovery] of Object.entries(state.recoveryCodes)) {
+        if (recovery.userId === user.userId) {
+          delete state.recoveryCodes[recoveryId];
+        }
+      }
+      delete state.users[user.userId];
+      persistState();
+      sendJson(res, 200, { ok: true, userId: user.userId }, headers);
+      return;
+    }
+
+    const revokeUserSessionsMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/sessions\/revoke$/);
+    if (req.method === "POST" && revokeUserSessionsMatch) {
+      const context = requireUserSession(req, res, {
+        requireWorkspace: false,
+        allowUnenrolled: false
+      });
+      if (!context) {
+        return;
+      }
+      if (!context.permissions.manageRelayUsers) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      const user = requireManagedUser(decodeURIComponent(revokeUserSessionsMatch[1]), res);
+      if (!user) {
+        return;
+      }
+      const revokedSessions = revokeSessionsForUser(user.userId);
+      sendJson(res, 200, { ok: true, revokedSessions, user: sanitizeManagedUser(user) }, headers);
+      return;
+    }
+
+    const recoveryCodeCreateMatch = pathname.match(/^\/api\/admin\/users\/([^/]+)\/recovery-codes$/);
+    if (req.method === "POST" && recoveryCodeCreateMatch) {
+      const context = requireUserSession(req, res, {
+        requireWorkspace: false,
+        allowUnenrolled: false
+      });
+      if (!context) {
+        return;
+      }
+      if (!context.permissions.manageRelayUsers) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      const user = requireManagedUser(decodeURIComponent(recoveryCodeCreateMatch[1]), res);
+      if (!user) {
+        return;
+      }
+      if (user.disabledAt) {
+        sendJson(res, 409, { error: "user-disabled" }, headers);
+        return;
+      }
+      const body = await readJsonBody(req, 4096);
+      const issued = issueRecoveryCodeForUser(
+        user.userId,
+        context.user.userId,
+        Number(body.ttlSec || 3600),
+        String(body.note || "")
+      );
+      sendJson(
+        res,
+        201,
+        {
+          ok: true,
+          recoveryCode: issued.recoveryCode,
+          recovery: issued.recovery,
+          user: sanitizeManagedUser(user)
+        },
+        headers
+      );
+      return;
+    }
+
+    const revokeMembershipMatch = pathname.match(/^\/api\/admin\/memberships\/([^/]+)\/revoke$/);
+    if (req.method === "POST" && revokeMembershipMatch) {
+      const context = requireUserSession(req, res, {
+        requireWorkspace: false,
+        allowUnenrolled: false
+      });
+      if (!context) {
+        return;
+      }
+      const membership = requireMembershipRecord(decodeURIComponent(revokeMembershipMatch[1]), res);
+      if (!membership) {
+        return;
+      }
+      const canManageMembership =
+        context.permissions.manageRelayUsers ||
+        (context.workspaceId === membership.workspaceId && roleAtLeast(context.role, "owner"));
+      if (!canManageMembership) {
+        sendJson(res, 403, { error: "insufficient-role" }, headers);
+        return;
+      }
+      if (membership.role === "owner" && activeOwnerCountForWorkspace(membership.workspaceId) <= 1) {
+        sendJson(res, 409, { error: "last-workspace-owner-protected" }, headers);
+        return;
+      }
+      membership.revokedAt = nowIso();
+      persistState();
+      sendJson(res, 200, { ok: true, membershipId: membership.membershipId }, headers);
       return;
     }
 

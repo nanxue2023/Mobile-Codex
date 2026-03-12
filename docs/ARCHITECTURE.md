@@ -8,7 +8,7 @@ Give a phone-friendly control plane for Codex tasks without requiring direct mob
 
 1. The `agent` runs on the server that owns the workspace.
 2. The `agent` only makes outbound requests to the `relay`.
-3. The phone opens the `web` PWA from the relay and authenticates with a bootstrap token.
+3. The phone opens the `web` PWA from the relay, uses a passkey or recovery token to create an admin session, and then operates through an `HttpOnly` same-site cookie.
 4. The PWA creates tasks on the relay.
 5. The agent polls for queued tasks, executes locally, then pushes back status, logs, and diff snippets.
 6. The relay persists only task metadata; sensitive task content is kept in memory and can be cached locally on the user's device.

@@ -53,6 +53,6 @@ export function resolveConfigPath(kind, explicitPath = "") {
 
 export function ensurePairCode(pairCode) {
   if (!pairCode) {
-    throw new Error("Missing --pair-code. Create a pairing code in the web UI, then run: npm run agent:pair -- --pair-code YOUR_CODE");
+    throw new Error("Missing --pair-code. Create a short pair code in the web UI, then run: npm run agent:pair -- --pair-code YOUR_CODE");
   }
 }

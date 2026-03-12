@@ -11,6 +11,7 @@ const configPath = args.config || path.resolve(process.cwd(), "config/agent.loca
 const loaded = loadConfig(configPath);
 const config = loaded.value;
 const agentRuntimeState = {
+  agentToken: "",
   sessionCatalog: {
     fetchedAt: 0,
     sessions: []
@@ -45,8 +46,81 @@ function persistAgentConfig() {
   fs.writeFileSync(loaded.path, JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
+function resolveAgentStateDir() {
+  const configured = String(config.stateDir || "").trim();
+  return path.resolve(loaded.dir, configured || ".agent-state");
+}
+
+function resolveAgentTokenFile() {
+  const configured = String(config.agentTokenFile || "").trim();
+  if (configured) {
+    return path.resolve(loaded.dir, configured);
+  }
+  return path.join(resolveAgentStateDir(), `${config.agentId || "agent"}.token`);
+}
+
+function readAgentTokenFile() {
+  try {
+    return fs.readFileSync(resolveAgentTokenFile(), "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+function writeAgentTokenFile(token) {
+  const tokenFile = resolveAgentTokenFile();
+  fs.mkdirSync(path.dirname(tokenFile), { recursive: true });
+  fs.writeFileSync(tokenFile, `${String(token || "").trim()}\n`, { mode: 0o600 });
+  fs.chmodSync(tokenFile, 0o600);
+  return tokenFile;
+}
+
+function currentAgentToken() {
+  return String(agentRuntimeState.agentToken || "").trim();
+}
+
+function loadAgentToken() {
+  const envToken = String(process.env.MOBILE_CODEX_AGENT_TOKEN || "").trim();
+  if (envToken) {
+    agentRuntimeState.agentToken = envToken;
+    return envToken;
+  }
+
+  const fileToken = readAgentTokenFile();
+  if (fileToken) {
+    agentRuntimeState.agentToken = fileToken;
+    return fileToken;
+  }
+
+  const legacyToken = String(config.agentToken || "").trim();
+  if (legacyToken) {
+    agentRuntimeState.agentToken = legacyToken;
+    return legacyToken;
+  }
+
+  agentRuntimeState.agentToken = "";
+  return "";
+}
+
+function migrateLegacyAgentToken() {
+  const legacyToken = String(config.agentToken || "").trim();
+  if (!legacyToken) {
+    return;
+  }
+  try {
+    writeAgentTokenFile(legacyToken);
+    config.agentToken = "";
+    persistAgentConfig();
+    console.log(`[agent] migrated legacy agent token into ${resolveAgentTokenFile()}`);
+  } catch (error) {
+    console.warn(
+      `[agent] warning: could not migrate legacy agent token into ${resolveAgentTokenFile()}: ${String(error.message || error)}`
+    );
+  }
+}
+
 async function ensureAgentToken() {
-  if (config.agentToken) {
+  if (currentAgentToken()) {
     return;
   }
   if (!args.pairCode) {
@@ -57,11 +131,42 @@ async function ensureAgentToken() {
     body: {
       pairingCode: args.pairCode,
       agentId: config.agentId,
-      label: config.agentLabel
+      label: config.agentLabel,
+      hostname: os.hostname(),
+      workspaceRootName: path.basename(config.workspaceRoot)
     }
   });
-  config.agentToken = body.token;
-  persistAgentConfig();
+  if (body.status !== "pending" || !body.requestId || !body.requestToken) {
+    throw new Error("pair-request-not-created");
+  }
+  console.log(`[agent] pair request submitted; waiting for approval (${body.requestId})`);
+
+  const deadline = Date.parse(body.expiresAt || "") || Date.now() + 300000;
+  while (Date.now() < deadline) {
+    await sleep(2500);
+    const status = await apiRequest(config.relayBaseUrl, "/api/agent/pair/status", {
+      method: "POST",
+      body: {
+        requestId: body.requestId,
+        requestToken: body.requestToken
+      }
+    });
+    if (status.status === "pending") {
+      continue;
+    }
+    if (status.status === "rejected") {
+      throw new Error("pair-request-rejected");
+    }
+    if (status.status === "approved" && status.token) {
+      writeAgentTokenFile(status.token);
+      agentRuntimeState.agentToken = status.token;
+      console.log("[agent] pair request approved");
+      return;
+    }
+    throw new Error(`unexpected-pair-status:${status.status}`);
+  }
+
+  throw new Error("pair-request-expired");
 }
 
 function advertisedActions() {
@@ -285,7 +390,7 @@ async function getAdvertisedCodexSessions() {
 async function updateTask(taskId, body) {
   await apiRequest(config.relayBaseUrl, `/api/agent/tasks/${taskId}/update`, {
     method: "POST",
-    token: config.agentToken,
+    token: currentAgentToken(),
     body
   });
 }
@@ -520,7 +625,7 @@ async function pollLoop() {
       const codexSessions = await getAdvertisedCodexSessions();
       const body = await apiRequest(config.relayBaseUrl, "/api/agent/poll", {
         method: "POST",
-        token: config.agentToken,
+        token: currentAgentToken(),
         body: {
           label: config.agentLabel,
           workspaceRootName: path.basename(config.workspaceRoot),
@@ -543,6 +648,9 @@ async function pollLoop() {
 
 async function main() {
   loadJson(loaded.path, config);
+  loadAgentToken();
+  migrateLegacyAgentToken();
+  loadAgentToken();
   await ensureAgentToken();
   console.log(`[agent] started for ${config.agentId}`);
   await pollLoop();

@@ -45,6 +45,7 @@ Notes:
 
 - The relay init script generates a plaintext `BOOTSTRAP_TOKEN` and prints it once.
 - The relay config stores only the hash, not the plaintext token.
+- For passkeys, set `publicOrigin` to the real HTTPS origin and optionally set `auth.passkeys.rpId` explicitly if you terminate TLS on a stable domain.
 - Both init scripts keep `codexExecWrite` disabled by default.
 - The relay init script also sets a pairing command config-path hint used by the web UI.
 
@@ -89,6 +90,7 @@ Recommended baseline:
 - Bind relay to `127.0.0.1:8787`
 - Put Caddy in front of it
 - Serve only `https://your-domain`
+- Use the HTTPS origin as `publicOrigin`; WebAuthn/passkeys depend on that exact origin and RP ID
 
 Example Caddyfile:
 
@@ -150,7 +152,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
 ReadOnlyPaths=/opt/mobile-codex /etc/mobile-codex/agent.prod.json
-ReadWritePaths=/srv/mobile-codex /etc/mobile-codex/agent.prod.json
+ReadWritePaths=/srv/mobile-codex /var/lib/mobile-codex-agent
 
 [Install]
 WantedBy=multi-user.target
@@ -161,6 +163,7 @@ Important:
 - If `node` is not at `/usr/bin/node`, replace it with the real path from `which node`.
 - The agent service user must be able to run `codex`.
 - The agent service user must already be logged in to Codex if you want `codex exec`.
+- The agent config should set `stateDir` to a directory writable by the agent service user, for example `/var/lib/mobile-codex-agent`.
 - If you used `npm run scaffold:production`, prefer copying the generated service files instead of retyping them.
 
 ## First Pairing
@@ -170,11 +173,12 @@ Recommended first-run order:
 1. Start relay first.
 2. Open the relay URL on your phone.
 3. Log in with `BOOTSTRAP_TOKEN`.
-4. Create a pairing code from the UI.
+4. Create a short pair code from the UI.
 5. Run the agent once manually with `--pair-code`.
-6. Confirm the agent appears in the UI.
-7. Stop the manual agent process.
-8. Enable and start the systemd agent service.
+6. Approve the pending device from the phone UI.
+7. Confirm the agent appears in the UI.
+8. Stop the manual agent process.
+9. Enable and start the systemd agent service.
 
 Manual agent pairing example:
 
@@ -187,7 +191,7 @@ sudo -u mobilecodexagent -H /usr/bin/npm run agent:pair -- --config /etc/mobile-
 After deployment:
 
 1. Verify the HTTPS site loads on phone.
-2. Verify login works with `BOOTSTRAP_TOKEN`.
+2. Log in once with `BOOTSTRAP_TOKEN`, register a passkey on your phone, then log out and verify passkey login works.
 3. Verify the agent appears.
 4. Submit `read_log`.
 5. Submit `run_action`.

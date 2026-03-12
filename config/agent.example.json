@@ -2,7 +2,7 @@
   "relayBaseUrl": "http://127.0.0.1:8787",
   "agentId": "server-main",
   "agentLabel": "Main Server",
-  "agentToken": "",
+  "stateDir": "../data/agent",
   "workspaceRoot": "/absolute/path/to/your/repo",
   "pollIntervalMs": 2500,
   "maxTaskLogBytes": 12000,

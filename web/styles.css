@@ -49,6 +49,11 @@ h2 {
   font-weight: 700;
 }
 
+h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
 h1 {
   font-size: clamp(2.4rem, 8vw, 4.5rem);
   letter-spacing: -0.04em;
@@ -91,6 +96,16 @@ label,
 form {
   display: grid;
   gap: 8px;
+}
+
+.auth-box + .auth-box {
+  margin-top: 14px;
+}
+
+.auth-box summary {
+  cursor: pointer;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-weight: 600;
 }
 
 form {
@@ -220,6 +235,14 @@ pre {
 
 #pair-command-box {
   margin-top: 12px;
+}
+
+#passkey-list {
+  margin-top: 14px;
+}
+
+#pair-requests {
+  margin-top: 14px;
 }
 
 .error {

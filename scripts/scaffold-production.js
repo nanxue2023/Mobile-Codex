@@ -95,7 +95,7 @@ WantedBy=multi-user.target
 `;
 }
 
-function buildAgentService({ agentUser, installRoot, agentConfigPath, workspaceRoot }) {
+function buildAgentService({ agentUser, installRoot, agentConfigPath, workspaceRoot, stateDir }) {
   return `[Unit]
 Description=Mobile Codex Agent
 After=network-online.target
@@ -114,7 +114,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=false
 ReadOnlyPaths=${installRoot} ${agentConfigPath}
-ReadWritePaths=${workspaceRoot} ${agentConfigPath}
+ReadWritePaths=${workspaceRoot} ${stateDir}
 
 [Install]
 WantedBy=multi-user.target
@@ -139,7 +139,8 @@ function buildSummary({
   outputDir,
   publicOrigin,
   stateDir,
-  workspaceRoot
+  workspaceRoot,
+  agentStateDir
 }) {
   return `# Production Scaffold
 
@@ -158,6 +159,7 @@ Assumptions:
 - agent config: ${agentConfigPath}
 - relay state dir: ${stateDir}
 - agent workspace: ${workspaceRoot}
+- agent state dir: ${agentStateDir}
 - public origin: ${publicOrigin}
 
 Suggested next steps:
@@ -216,7 +218,8 @@ function main() {
       agentUser: args.agentUser,
       installRoot: args.installRoot,
       agentConfigPath,
-      workspaceRoot: agentConfig.workspaceRoot
+      workspaceRoot: agentConfig.workspaceRoot,
+      stateDir: agentConfig.stateDir || path.join(path.dirname(agentConfigPath), ".agent-state")
     })
   );
   writeText(
@@ -234,7 +237,8 @@ function main() {
       outputDir,
       publicOrigin: relayConfig.publicOrigin,
       stateDir: relayConfig.dataDir,
-      workspaceRoot: agentConfig.workspaceRoot
+      workspaceRoot: agentConfig.workspaceRoot,
+      agentStateDir: agentConfig.stateDir || path.join(path.dirname(agentConfigPath), ".agent-state")
     })
   );
 

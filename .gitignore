@@ -1,9 +1,11 @@
 data/
 node_modules/
 *.log
+*.token
 *.local.json
 *.local
 web-cache/
+.agent-state/
 config/.codex-last-*
 config/*.prod.json
 deploy/generated/

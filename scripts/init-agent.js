@@ -1,4 +1,5 @@
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   askChoice,
   askText,
@@ -15,6 +16,8 @@ import {
 } from "./init-common.js";
 
 const args = parseInitArgs(process.argv);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRoot = path.resolve(__dirname, "..");
 
 const presets = {
   test: {
@@ -22,14 +25,16 @@ const presets = {
     relayBaseUrl: "http://127.0.0.1:8787",
     agentId: "server-main",
     agentLabel: "Main Server",
-    workspaceRoot: process.cwd()
+    workspaceRoot: process.cwd(),
+    stateDir: path.join(projectRoot, "data", "agent")
   },
   production: {
     output: "config/agent.prod.json",
     relayBaseUrl: "https://mobile-codex.example.com",
     agentId: "server-main",
     agentLabel: "Main Server",
-    workspaceRoot: "/srv/mobile-codex/workspace"
+    workspaceRoot: "/srv/mobile-codex/workspace",
+    stateDir: "/var/lib/mobile-codex-agent"
   }
 };
 
@@ -63,6 +68,7 @@ async function main() {
     const agentId = await askText(rl, "Agent id", preset.agentId, validateAgentId);
     const agentLabel = await askText(rl, "Agent label", preset.agentLabel, validateNonEmpty);
     const workspaceRoot = await askText(rl, "Workspace root (absolute path)", preset.workspaceRoot, validateAbsolutePath);
+    const stateDir = await askText(rl, "Agent state directory", preset.stateDir, validateNonEmpty);
 
     const actions = {};
     const includeStatusAction = await askYesNo(rl, "Add a sample read-only Git status action", true);
@@ -113,7 +119,7 @@ async function main() {
       relayBaseUrl,
       agentId,
       agentLabel,
-      agentToken: "",
+      stateDir,
       workspaceRoot,
       pollIntervalMs: 2500,
       maxTaskLogBytes: 12000,
@@ -137,8 +143,8 @@ async function main() {
     console.log(`Wrote agent config: ${writtenPath}`);
     console.log("");
     console.log("Notes:");
-    console.log("- agentToken is intentionally empty before first pairing.");
-    console.log("- First successful pairing will write agentToken back into this file.");
+    console.log("- The agent token is not stored in this config file.");
+    console.log(`- First successful pairing will write the agent token into ${path.resolve(stateDir)} with 0600 permissions.`);
     console.log("- codexExecWrite is disabled by default for safety.");
     console.log("");
     console.log("Next step:");

@@ -18,14 +18,21 @@
 
       <section id="login-panel" class="panel">
         <h2>Login</h2>
-        <form id="login-form">
-          <label>
-            <span>Bootstrap Token</span>
-            <input id="bootstrap-token" type="password" autocomplete="off" required>
-          </label>
-          <button type="submit">Unlock</button>
-        </form>
-        <p class="hint">Use a long bootstrap token stored in your password manager. The app stores only a signed session token.</p>
+        <div id="passkey-login-box" class="auth-box">
+          <button id="passkey-login-button" type="button">Continue With Passkey</button>
+          <p id="passkey-login-hint" class="hint">Use the passkey already registered for this relay.</p>
+        </div>
+        <details id="recovery-login-box" class="auth-box">
+          <summary>Use Recovery Token Instead</summary>
+          <form id="login-form">
+            <label>
+              <span>Bootstrap Token</span>
+              <input id="bootstrap-token" type="password" autocomplete="off">
+            </label>
+            <button type="submit">Unlock With Recovery Token</button>
+          </form>
+          <p class="hint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
+        </details>
       </section>
 
       <section id="dashboard" class="hidden">
@@ -42,6 +49,19 @@
         </section>
 
         <section class="panel">
+          <h2>Security</h2>
+          <p id="auth-status-line" class="hint">Checking passkey status…</p>
+          <form id="passkey-form">
+            <label>
+              <span>New Passkey Label</span>
+              <input id="passkey-label" type="text" maxlength="80" placeholder="My iPhone">
+            </label>
+            <button id="passkey-register-button" type="submit">Add This Device As A Passkey</button>
+          </form>
+          <div id="passkey-list"></div>
+        </section>
+
+        <section class="panel">
           <h2>Pair Agent</h2>
           <form id="pair-form">
             <label>
@@ -52,7 +72,7 @@
               <span>TTL Seconds</span>
               <input id="pair-ttl" type="number" min="60" max="1800" value="300">
             </label>
-            <button type="submit">Create Pair Code</button>
+            <button type="submit">Create Short Pair Code</button>
           </form>
           <pre id="pair-result" class="result-box"></pre>
           <div id="pair-command-box" class="hidden">
@@ -62,6 +82,7 @@
             </label>
             <button id="copy-pair-command" type="button">Copy Pair Command</button>
           </div>
+          <div id="pair-requests"></div>
         </section>
 
         <section class="panel">

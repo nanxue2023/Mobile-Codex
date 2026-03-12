@@ -12,9 +12,11 @@ Assume:
 ## Current Protections
 
 - Bootstrap token is stored as SHA-256 hash on the relay.
-- Mobile sessions use signed bearer tokens with expiration.
+- Daily mobile sessions use relay-backed `HttpOnly` same-site cookies instead of browser-readable bearer tokens.
+- WebAuthn/passkey challenges stay in relay memory only and expire quickly.
 - Agent pairing uses short-lived one-time pairing codes.
 - Agent tokens can be revoked from the web UI.
+- Passkey credentials persist only the public key, credential id, transport hints, and usage counter.
 - Relay and agent both enforce feature flags.
 - Relay persists only minimal task metadata to disk. Prompt text, task output, diff text, and result bodies are kept out of `state.json`.
 - Task details can be cached locally in the browser on the user's device instead of on the relay.
@@ -22,6 +24,7 @@ Assume:
 - Codex session browsing is limited to sessions whose recorded CWD stays under the configured `workspaceRoot`.
 - Resume-mode Codex tasks block autonomous write mode by default.
 - The agent exposes predefined actions and predefined log sources, not arbitrary command lines or paths.
+- Agent tokens are stored in a dedicated local state directory with `0600` permissions instead of being written back to the config file.
 - `codex_exec` write mode is disabled by default.
 - Diff snippets are capped in size before being returned to the phone.
 - Security headers and a restrictive CSP are enabled on the web UI.
@@ -36,12 +39,12 @@ Assume:
 - Rotate the bootstrap token and token secret after suspected exposure.
 - Keep `runAction` and `readLog` narrowed to the minimum useful set.
 - Keep `codexExecWrite` off until you trust the surrounding controls.
+- Treat the bootstrap token as recovery-only access once you have registered at least one passkey.
 
 ## Deliberate Omissions
 
 These are not implemented in the MVP and should be considered before broader use:
 
-- WebAuthn or passkey login
 - Multi-user RBAC
 - End-to-end encryption between phone and agent
 - Signed audit export

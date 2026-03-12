@@ -2,8 +2,9 @@ const taskCacheKey = "mobileCodexTaskCache.v1";
 const sessionCacheKey = "mobileCodexSessionCache.v1";
 const cachedTaskFields = ["prompt", "summary", "outputTail", "diffText", "error", "result"];
 const state = {
-  token: localStorage.getItem("mobileCodexToken") || "",
+  authenticated: false,
   data: null,
+  authStatus: null,
   pollTimer: null,
   taskCache: loadTaskCache(),
   sessionCache: loadSessionCache(),
@@ -13,6 +14,7 @@ const state = {
 const loginPanel = document.querySelector("#login-panel");
 const dashboard = document.querySelector("#dashboard");
 const loginForm = document.querySelector("#login-form");
+const passkeyForm = document.querySelector("#passkey-form");
 const taskForm = document.querySelector("#task-form");
 const pairForm = document.querySelector("#pair-form");
 const tasksEl = document.querySelector("#tasks");
@@ -27,11 +29,35 @@ const clearTaskCacheButton = document.querySelector("#clear-task-cache-button");
 const pairCommandBox = document.querySelector("#pair-command-box");
 const pairCommand = document.querySelector("#pair-command");
 const copyPairCommandButton = document.querySelector("#copy-pair-command");
+const pairRequestsEl = document.querySelector("#pair-requests");
 const sessionList = document.querySelector("#session-list");
 const resumeSessionBanner = document.querySelector("#resume-session-banner");
 const resumeSessionLabel = document.querySelector("#resume-session-label");
 const clearSessionSelectionButton = document.querySelector("#clear-session-selection");
 const promptLabel = document.querySelector("#codex-prompt-row span");
+const passkeyLoginButton = document.querySelector("#passkey-login-button");
+const passkeyLoginBox = document.querySelector("#passkey-login-box");
+const passkeyLoginHint = document.querySelector("#passkey-login-hint");
+const recoveryLoginBox = document.querySelector("#recovery-login-box");
+const authStatusLine = document.querySelector("#auth-status-line");
+const passkeyList = document.querySelector("#passkey-list");
+const passkeyLabelInput = document.querySelector("#passkey-label");
+
+function bytesToBase64Url(value) {
+  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+  let text = "";
+  for (const byte of bytes) {
+    text += String.fromCharCode(byte);
+  }
+  return btoa(text).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlToBytes(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (normalized.length % 4)) % 4);
+  const decoded = atob(normalized + padding);
+  return Uint8Array.from(decoded, (char) => char.charCodeAt(0));
+}
 
 function loadTaskCache() {
   try {
@@ -63,6 +89,71 @@ function persistSessionCache() {
     .slice(0, 20);
   state.sessionCache = Object.fromEntries(entries);
   localStorage.setItem(sessionCacheKey, JSON.stringify(state.sessionCache));
+}
+
+function webauthnAvailable() {
+  return typeof window.PublicKeyCredential !== "undefined" && !!navigator.credentials && window.isSecureContext;
+}
+
+function decodeCredentialDescriptor(descriptor) {
+  return {
+    ...descriptor,
+    id: base64UrlToBytes(descriptor.id)
+  };
+}
+
+function decodeCreationOptions(publicKey) {
+  return {
+    ...publicKey,
+    challenge: base64UrlToBytes(publicKey.challenge),
+    user: {
+      ...publicKey.user,
+      id: base64UrlToBytes(publicKey.user.id)
+    },
+    excludeCredentials: Array.isArray(publicKey.excludeCredentials)
+      ? publicKey.excludeCredentials.map(decodeCredentialDescriptor)
+      : []
+  };
+}
+
+function decodeRequestOptions(publicKey) {
+  return {
+    ...publicKey,
+    challenge: base64UrlToBytes(publicKey.challenge),
+    allowCredentials: Array.isArray(publicKey.allowCredentials)
+      ? publicKey.allowCredentials.map(decodeCredentialDescriptor)
+      : []
+  };
+}
+
+function serializeCredential(credential) {
+  const response = credential.response;
+  const payload = {
+    id: credential.id,
+    rawId: bytesToBase64Url(credential.rawId),
+    type: credential.type,
+    response: {
+      clientDataJSON: bytesToBase64Url(response.clientDataJSON)
+    }
+  };
+
+  if (response.attestationObject) {
+    payload.response.attestationObject = bytesToBase64Url(response.attestationObject);
+  }
+  if (response.authenticatorData) {
+    payload.response.authenticatorData = bytesToBase64Url(response.authenticatorData);
+  }
+  if (response.signature) {
+    payload.response.signature = bytesToBase64Url(response.signature);
+  }
+  if (response.userHandle) {
+    payload.response.userHandle = bytesToBase64Url(response.userHandle);
+  }
+  if (typeof response.getTransports === "function") {
+    payload.response.transports = response.getTransports();
+  }
+
+  return payload;
 }
 
 function mergeTaskFromCache(task) {
@@ -149,6 +240,70 @@ function clearSelectedSession() {
   syncTaskFields();
 }
 
+function summarizeCredentialId(credentialId) {
+  return credentialId.length > 18 ? `${credentialId.slice(0, 8)}…${credentialId.slice(-6)}` : credentialId;
+}
+
+function passkeyCard(passkey) {
+  return `
+    <article class="session-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(passkey.label || "Passkey")}</strong>
+          <p>${escapeHtml(summarizeCredentialId(passkey.credentialId || ""))}</p>
+        </div>
+        <div class="task-meta">${passkey.lastUsedAt ? `Used ${new Date(passkey.lastUsedAt).toLocaleDateString()}` : "Never used"}</div>
+      </header>
+      <p class="task-body">Created ${new Date(passkey.createdAt).toLocaleString()}</p>
+      ${
+        (passkey.transports || []).length
+          ? `<p class="task-summary">Transports: ${escapeHtml(passkey.transports.join(", "))}</p>`
+          : ""
+      }
+      <div class="actions">
+        <button type="button" class="secondary" data-revoke-passkey="${encodeURIComponent(passkey.credentialId)}">Revoke</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderAuthStatus(auth) {
+  state.authStatus = auth || null;
+  const passkeysEnabled = !!auth?.passkeysEnabled;
+  const hasPasskeys = !!auth?.hasPasskeys;
+  const supported = webauthnAvailable();
+
+  passkeyLoginBox.classList.toggle("hidden", !passkeysEnabled || !hasPasskeys);
+  passkeyLoginButton.disabled = !supported;
+  recoveryLoginBox.open = !passkeysEnabled || !hasPasskeys;
+  passkeyLoginHint.textContent = !supported
+    ? "This browser cannot use passkeys here. Use Safari/Chrome on a secure origin, or fall back to the recovery token."
+    : hasPasskeys
+      ? "Use the passkey already registered for this relay."
+      : "No passkeys registered yet.";
+
+  if (state.authenticated) {
+    authStatusLine.textContent = passkeysEnabled
+      ? `${auth.passkeyCount} passkey(s) registered. Recovery token remains available for break-glass access.`
+      : "Passkeys are unavailable here. Check HTTPS/publicOrigin and passkey configuration.";
+    passkeyForm.classList.toggle("hidden", !passkeysEnabled || !supported);
+    passkeyList.innerHTML = (auth.passkeys || []).length
+      ? auth.passkeys.map(passkeyCard).join("")
+      : "<p class='hint'>No passkeys registered yet. Add this phone once, then use passkey login from then on.</p>";
+  }
+}
+
+async function refreshAuthStatus() {
+  try {
+    const body = await api("/api/auth/status");
+    state.authenticated = !!body.authenticated;
+    renderAuthStatus(body.auth);
+  } catch {
+    state.authenticated = false;
+    renderAuthStatus(null);
+  }
+}
+
 function shellEscape(value) {
   return `'${String(value).replaceAll("'", `'\"'\"'`)}'`;
 }
@@ -166,9 +321,9 @@ function showDashboard(visible) {
 async function api(path, options = {}) {
   const response = await fetch(path, {
     method: options.method || "GET",
+    credentials: "same-origin",
     headers: {
-      "content-type": "application/json",
-      ...(state.token ? { authorization: `Bearer ${state.token}` } : {})
+      "content-type": "application/json"
     },
     body: options.body ? JSON.stringify(options.body) : undefined
   });
@@ -220,6 +375,26 @@ function taskCard(task) {
   `;
 }
 
+function pairRequestCard(request) {
+  return `
+    <article class="session-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(request.label || request.agentId || "Pending Device")}</strong>
+          <p>${escapeHtml(request.agentId)} · ${escapeHtml(request.hostname || "unknown host")}</p>
+        </div>
+        <div class="task-meta">${new Date(request.createdAt).toLocaleString()}</div>
+      </header>
+      ${request.note ? `<p class="task-body">${escapeHtml(request.note)}</p>` : ""}
+      ${request.workspaceRootName ? `<p class="task-summary">Workspace: ${escapeHtml(request.workspaceRootName)}</p>` : ""}
+      <div class="actions">
+        <button type="button" data-approve-pair="${request.requestId}">Approve Device</button>
+        <button type="button" class="secondary" data-reject-pair="${request.requestId}">Reject</button>
+      </div>
+    </article>
+  `;
+}
+
 function escapeHtml(value) {
   return value
     .replaceAll("&", "&amp;")
@@ -239,6 +414,7 @@ function renderState(data) {
     agents,
     tasks
   };
+  renderAuthStatus(data.auth || state.authStatus);
   const currentAgentId = agentSelect.value;
   agentSelect.innerHTML = "";
   actionSelect.innerHTML = "";
@@ -274,6 +450,9 @@ function renderState(data) {
 
   statusLine.textContent = `${(state.data.agents || []).length} agent(s), ${(state.data.tasks || []).length} recent task(s)`;
   tasksEl.innerHTML = (state.data.tasks || []).map(taskCard).join("") || "<p class='hint'>No tasks yet.</p>";
+  pairRequestsEl.innerHTML = (state.data.pendingPairRequests || []).length
+    ? `<h3>Pending Approval</h3>${state.data.pendingPairRequests.map(pairRequestCard).join("")}`
+    : "<p class='hint'>No pending devices waiting for approval.</p>";
   renderSessionList(selectedAgent);
   const relayFeatures = state.data.features || {};
   document.querySelector("#write-row").classList.toggle("hidden", taskType.value !== "codex_exec" || !relayFeatures.codexExecWrite);
@@ -331,13 +510,15 @@ function syncTaskFields() {
 
 async function refresh() {
   const data = await api("/api/admin/state");
+  state.authenticated = true;
+  showDashboard(true);
   renderState(data);
   const desiredInterval = Number(data.web?.pollIntervalMs || 2500);
   if (state.pollTimer) {
     clearInterval(state.pollTimer);
   }
   state.pollTimer = setInterval(() => {
-    if (state.token) {
+    if (state.authenticated) {
       refresh().catch(() => {});
     }
   }, desiredInterval);
@@ -348,22 +529,85 @@ async function login(bootstrapToken) {
     method: "POST",
     body: { bootstrapToken }
   });
-  state.token = data.token;
-  localStorage.setItem("mobileCodexToken", state.token);
+  state.authenticated = true;
   showDashboard(true);
+  renderAuthStatus(data.auth || state.authStatus);
+  await refreshAuthStatus();
   await refresh();
 }
 
-function logout() {
-  localStorage.removeItem("mobileCodexToken");
-  state.token = "";
+async function loginWithPasskey() {
+  if (!webauthnAvailable()) {
+    throw new Error("passkeys-unavailable-in-this-browser");
+  }
+  const options = await api("/api/auth/passkeys/login/options", {
+    method: "POST",
+    body: {}
+  });
+  const credential = await navigator.credentials.get({
+    publicKey: decodeRequestOptions(options.publicKey)
+  });
+  if (!credential) {
+    throw new Error("passkey-login-cancelled");
+  }
+  const verified = await api("/api/auth/passkeys/login/verify", {
+    method: "POST",
+    body: {
+      loginId: options.loginId,
+      credential: serializeCredential(credential)
+    }
+  });
+  state.authenticated = true;
+  showDashboard(true);
+  renderAuthStatus(verified.auth || state.authStatus);
+  await refresh();
+}
+
+async function registerPasskey() {
+  if (!webauthnAvailable()) {
+    throw new Error("passkeys-unavailable-in-this-browser");
+  }
+  const label = passkeyLabelInput.value.trim() || "This Device";
+  const options = await api("/api/auth/passkeys/register/options", {
+    method: "POST",
+    body: { label }
+  });
+  const credential = await navigator.credentials.create({
+    publicKey: decodeCreationOptions(options.publicKey)
+  });
+  if (!credential) {
+    throw new Error("passkey-registration-cancelled");
+  }
+  const verified = await api("/api/auth/passkeys/register/verify", {
+    method: "POST",
+    body: {
+      registrationId: options.registrationId,
+      credential: serializeCredential(credential)
+    }
+  });
+  renderAuthStatus(verified.auth || state.authStatus);
+  passkeyLabelInput.value = "";
+}
+
+function clearAuthenticatedState() {
+  state.authenticated = false;
   state.data = null;
   state.selectedSessionId = "";
   if (state.pollTimer) {
     clearInterval(state.pollTimer);
     state.pollTimer = null;
   }
+}
+
+async function logout() {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+  } catch {
+    // Ignore logout transport failures and clear local UI state anyway.
+  }
+  clearAuthenticatedState();
   showDashboard(false);
+  refreshAuthStatus().catch(() => {});
 }
 
 loginForm.addEventListener("submit", async (event) => {
@@ -371,6 +615,23 @@ loginForm.addEventListener("submit", async (event) => {
   try {
     const token = document.querySelector("#bootstrap-token").value.trim();
     await login(token);
+  } catch (error) {
+    alert(String(error.message || error));
+  }
+});
+
+passkeyLoginButton.addEventListener("click", async () => {
+  try {
+    await loginWithPasskey();
+  } catch (error) {
+    alert(String(error.message || error));
+  }
+});
+
+passkeyForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await registerPasskey();
   } catch (error) {
     alert(String(error.message || error));
   }
@@ -426,7 +687,7 @@ pairForm.addEventListener("submit", async (event) => {
         ttlSec: Number(document.querySelector("#pair-ttl").value || 300)
       }
     });
-    pairResult.textContent = `Pairing code: ${body.pairingCode}\nExpires: ${body.expiresAt}`;
+    pairResult.textContent = `Short pair code: ${body.pairingCode}\nExpires: ${body.expiresAt}\nThis code is single-use and still requires phone approval.`;
     pairCommand.value = buildPairCommand(body.pairingCode);
     pairCommandBox.classList.remove("hidden");
   } catch (error) {
@@ -449,7 +710,9 @@ copyPairCommandButton.addEventListener("click", async () => {
 });
 
 document.querySelector("#refresh-button").addEventListener("click", refresh);
-logoutButton.addEventListener("click", logout);
+logoutButton.addEventListener("click", () => {
+  logout().catch(() => {});
+});
 clearTaskCacheButton.addEventListener("click", () => {
   state.taskCache = {};
   state.sessionCache = {};
@@ -480,6 +743,22 @@ tasksEl.addEventListener("click", async (event) => {
   }
 });
 
+pairRequestsEl.addEventListener("click", async (event) => {
+  const approveId = event.target.getAttribute("data-approve-pair");
+  const rejectId = event.target.getAttribute("data-reject-pair");
+  try {
+    if (approveId) {
+      await api(`/api/admin/pair-requests/${approveId}/approve`, { method: "POST" });
+      await refresh();
+    } else if (rejectId) {
+      await api(`/api/admin/pair-requests/${rejectId}/reject`, { method: "POST" });
+      await refresh();
+    }
+  } catch (error) {
+    alert(String(error.message || error));
+  }
+});
+
 sessionList.addEventListener("click", (event) => {
   const sessionId = event.target.getAttribute("data-use-session");
   if (!sessionId) {
@@ -492,16 +771,35 @@ sessionList.addEventListener("click", (event) => {
   document.querySelector("#task-prompt").focus();
 });
 
+passkeyList.addEventListener("click", async (event) => {
+  const credentialId = event.target.getAttribute("data-revoke-passkey");
+  if (!credentialId) {
+    return;
+  }
+  if (!confirm("Revoke this passkey? Recovery token access will still remain available.")) {
+    return;
+  }
+  try {
+    const result = await api(`/api/admin/passkeys/${credentialId}/revoke`, {
+      method: "POST"
+    });
+    renderAuthStatus(result.auth || state.authStatus);
+  } catch (error) {
+    alert(String(error.message || error));
+  }
+});
+
 syncTaskFields();
 
-if (state.token) {
-  showDashboard(true);
-  refresh().catch(() => {
-    logout();
+showDashboard(false);
+refreshAuthStatus()
+  .catch(() => {})
+  .finally(() => {
+    refresh().catch(() => {
+      clearAuthenticatedState();
+      showDashboard(false);
+    });
   });
-} else {
-  showDashboard(false);
-}
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});

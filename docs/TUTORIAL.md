@@ -220,7 +220,7 @@ Use a local test config like this:
   "relayBaseUrl": "http://127.0.0.1:8787",
   "agentId": "server-main",
   "agentLabel": "Main Server",
-  "agentToken": "",
+  "stateDir": "/absolute/path/to/mobile-codex-agent-state",
   "workspaceRoot": "/path/to/your/workspace",
   "pollIntervalMs": 2500,
   "maxTaskLogBytes": 12000,
@@ -256,18 +256,18 @@ Use a local test config like this:
 Replace these:
 
 - `workspaceRoot`
+- `stateDir`
 - `actions`
 - `logSources`
 
 Keep these for first test:
 
-- `agentToken = ""`
 - `codexExecWrite = false`
 
 Notes:
 
 - `workspaceRoot` must be an absolute path
-- `agentToken` must stay empty before first pairing
+- `stateDir` must point to a directory the agent user can write
 - `actions` are predefined commands, not arbitrary shell
 - `logSources` are predefined absolute paths, not arbitrary file reads
 
@@ -331,7 +331,7 @@ If the UI generated a command with `--config ...`, prefer copying that exact com
 On first success:
 
 - the agent will pair with the relay
-- `agentToken` will be written back to `config/agent.local.json`
+- a token file will be created under `stateDir` with `0600` permissions
 
 Next time you can start it without the pairing code:
 
@@ -373,7 +373,7 @@ Check:
 - relay is running
 - agent is running
 - `relayBaseUrl` is correct
-- `agentToken` is still empty before first pairing or valid after pairing
+- the configured `stateDir` exists and is writable by the agent user
 
 ### `Run Action` fails
 

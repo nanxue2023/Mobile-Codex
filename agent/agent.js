@@ -1,5 +1,7 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import readline from "node:readline";
 import { spawn } from "node:child_process";
 import { parseArgs, loadConfig } from "../lib/config.js";
 import { clampText, loadJson, nowIso, resolveWithin, sleep } from "../lib/common.js";
@@ -8,6 +10,12 @@ const args = parseArgs(process.argv);
 const configPath = args.config || path.resolve(process.cwd(), "config/agent.local.json");
 const loaded = loadConfig(configPath);
 const config = loaded.value;
+const agentRuntimeState = {
+  sessionCatalog: {
+    fetchedAt: 0,
+    sessions: []
+  }
+};
 
 async function apiRequest(baseUrl, pathname, options = {}) {
   const response = await fetch(new URL(pathname, baseUrl), {
@@ -68,6 +76,210 @@ function advertisedLogs() {
     id,
     label: source.label || id
   }));
+}
+
+function resetSessionCatalogCache() {
+  agentRuntimeState.sessionCatalog.fetchedAt = 0;
+}
+
+function isWithinWorkspace(targetPath) {
+  const root = path.resolve(config.workspaceRoot);
+  const resolved = path.resolve(targetPath);
+  return resolved === root || resolved.startsWith(`${root}${path.sep}`);
+}
+
+function getCodexHome() {
+  return path.resolve(config.codex?.homeDir || path.join(os.homedir(), ".codex"));
+}
+
+function getCodexSessionsRoot() {
+  return path.resolve(config.codex?.sessionsRoot || path.join(getCodexHome(), "sessions"));
+}
+
+function getCodexStateDbPath() {
+  if (config.codex?.stateDbPath) {
+    return path.resolve(config.codex.stateDbPath);
+  }
+
+  const home = getCodexHome();
+  try {
+    const candidates = fs
+      .readdirSync(home)
+      .filter((name) => /^state_\d+\.sqlite$/.test(name))
+      .map((name) => path.join(home, name))
+      .map((filePath) => ({
+        filePath,
+        mtimeMs: fs.statSync(filePath).mtimeMs
+      }))
+      .sort((left, right) => right.mtimeMs - left.mtimeMs);
+    return candidates[0]?.filePath || path.join(home, "state_5.sqlite");
+  } catch {
+    return path.join(home, "state_5.sqlite");
+  }
+}
+
+async function querySqliteJson(sqlitePath, query) {
+  const result = await spawnCommand(["sqlite3", "-json", sqlitePath, query], process.cwd(), 15, () => {});
+  if (result.code !== 0) {
+    throw new Error(result.stderr || "sqlite-query-failed");
+  }
+  const text = result.stdout.trim();
+  return text ? JSON.parse(text) : [];
+}
+
+function toIsoFromUnixSeconds(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? new Date(numeric * 1000).toISOString() : nowIso();
+}
+
+function summarizeSessionText(value, maxChars = 240) {
+  return clampText(String(value || "").replace(/\s+/g, " ").trim(), maxChars);
+}
+
+function extractMessageText(role, content) {
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  const allowedType = role === "assistant" ? "output_text" : "input_text";
+  return summarizeSessionText(
+    content
+      .filter((item) => item?.type === allowedType && typeof item.text === "string")
+      .map((item) => item.text)
+      .join("\n"),
+    320
+  );
+}
+
+async function readSessionPreview(rolloutPath) {
+  const sessionsRoot = getCodexSessionsRoot();
+  const resolvedPath = path.resolve(rolloutPath);
+  if (!resolvedPath.startsWith(`${sessionsRoot}${path.sep}`)) {
+    return [];
+  }
+
+  const previews = [];
+  const stream = fs.createReadStream(resolvedPath, { encoding: "utf8" });
+  const lines = readline.createInterface({
+    input: stream,
+    crlfDelay: Infinity
+  });
+
+  try {
+    for await (const line of lines) {
+      if (!line) {
+        continue;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (parsed.type !== "response_item" || parsed.payload?.type !== "message") {
+        continue;
+      }
+      const role = parsed.payload.role;
+      if (role !== "user" && role !== "assistant") {
+        continue;
+      }
+      const text = extractMessageText(role, parsed.payload.content);
+      if (!text) {
+        continue;
+      }
+      previews.push({
+        role,
+        text,
+        timestamp: parsed.timestamp || nowIso()
+      });
+      if (previews.length > 6) {
+        previews.shift();
+      }
+    }
+  } finally {
+    lines.close();
+    stream.destroy();
+  }
+
+  return previews.slice(-4);
+}
+
+async function loadCodexSessions() {
+  const sqlitePath = getCodexStateDbPath();
+  if (!fs.existsSync(sqlitePath)) {
+    return [];
+  }
+
+  const listLimit = Math.max(1, Math.min(Number(config.codex?.sessionListLimit || 12), 30));
+  const rows = await querySqliteJson(
+    sqlitePath,
+    [
+      "select",
+      "id,",
+      "rollout_path as rolloutPath,",
+      "created_at as createdAt,",
+      "updated_at as updatedAt,",
+      "source,",
+      "cwd,",
+      "title,",
+      "first_user_message as firstUserMessage",
+      "from threads",
+      "where archived = 0",
+      "order by updated_at desc",
+      `limit ${Math.max(listLimit * 3, 20)}`
+    ].join(" ")
+  );
+
+  const scopedRows = rows.filter((row) => row?.cwd && isWithinWorkspace(row.cwd)).slice(0, listLimit);
+  const sessions = [];
+
+  for (const row of scopedRows) {
+    let preview = [];
+    try {
+      preview = await readSessionPreview(row.rolloutPath);
+    } catch {
+      preview = [];
+    }
+
+    sessions.push({
+      sessionId: String(row.id || ""),
+      title: summarizeSessionText(row.title || row.firstUserMessage || row.id || "Codex Session", 180),
+      firstUserMessage: summarizeSessionText(row.firstUserMessage || "", 240),
+      updatedAt: toIsoFromUnixSeconds(row.updatedAt),
+      createdAt: toIsoFromUnixSeconds(row.createdAt),
+      cwd: path.relative(config.workspaceRoot, row.cwd || config.workspaceRoot) || ".",
+      source: summarizeSessionText(row.source || "", 24),
+      preview
+    });
+  }
+
+  return sessions;
+}
+
+async function getAdvertisedCodexSessions() {
+  if (!config.features?.codexExec) {
+    return [];
+  }
+
+  const ttlMs = Math.max(5000, Math.min(Number(config.codex?.sessionCatalogTtlMs || 30000), 300000));
+  const now = Date.now();
+  if (now - agentRuntimeState.sessionCatalog.fetchedAt < ttlMs) {
+    return agentRuntimeState.sessionCatalog.sessions;
+  }
+
+  try {
+    const sessions = await loadCodexSessions();
+    agentRuntimeState.sessionCatalog = {
+      fetchedAt: now,
+      sessions
+    };
+  } catch (error) {
+    console.error(`[agent] codex sessions unavailable: ${String(error.message || error)}`);
+    agentRuntimeState.sessionCatalog = {
+      fetchedAt: now,
+      sessions: []
+    };
+  }
+  return agentRuntimeState.sessionCatalog.sessions;
 }
 
 async function updateTask(taskId, body) {
@@ -136,25 +348,31 @@ async function runCodexExec(task) {
     throw new Error("codex-exec-disabled-locally");
   }
 
+  const isResume = typeof task.resumeSessionId === "string" && task.resumeSessionId.trim().length > 0;
   const wantsWrite = !!task.writeAccess;
+  if (isResume && wantsWrite) {
+    throw new Error("resume-write-mode-disabled");
+  }
   if (wantsWrite && !config.features?.codexExecWrite) {
     throw new Error("codex-write-mode-disabled-locally");
   }
 
   const targetCwd = resolveWithin(config.workspaceRoot, task.cwd || ".");
   const outputFile = path.join(path.dirname(loaded.path), `.codex-last-${task.taskId}.txt`);
-  const argv = [
-    "codex",
-    "exec",
-    "--json",
-    "--skip-git-repo-check",
-    "-C",
-    targetCwd,
-    "--sandbox",
-    wantsWrite ? "workspace-write" : "read-only",
-    "--output-last-message",
-    outputFile
-  ];
+  const argv = isResume
+    ? ["codex", "exec", "resume", "--json", "--skip-git-repo-check", "--output-last-message", outputFile]
+    : [
+        "codex",
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        "-C",
+        targetCwd,
+        "--sandbox",
+        wantsWrite ? "workspace-write" : "read-only",
+        "--output-last-message",
+        outputFile
+      ];
 
   if (config.codex?.model) {
     argv.push("--model", config.codex.model);
@@ -165,7 +383,14 @@ async function runCodexExec(task) {
   for (const extraArg of config.codex?.extraArgs || []) {
     argv.push(extraArg);
   }
-  argv.push(task.prompt);
+  if (isResume) {
+    argv.push(task.resumeSessionId.trim());
+    if (task.prompt) {
+      argv.push(task.prompt);
+    }
+  } else {
+    argv.push(task.prompt);
+  }
 
   let pendingOutput = "";
   const flushOutput = async (force = false) => {
@@ -195,6 +420,7 @@ async function runCodexExec(task) {
   }
 
   const diffText = wantsWrite ? await captureGitDiff(targetCwd) : "";
+  resetSessionCatalogCache();
   return {
     status: result.code === 0 ? "completed" : "failed",
     summary: clampText(lastMessage || result.stderr || result.stdout, 2000),
@@ -291,6 +517,7 @@ async function handleTask(task) {
 async function pollLoop() {
   while (true) {
     try {
+      const codexSessions = await getAdvertisedCodexSessions();
       const body = await apiRequest(config.relayBaseUrl, "/api/agent/poll", {
         method: "POST",
         token: config.agentToken,
@@ -299,7 +526,8 @@ async function pollLoop() {
           workspaceRootName: path.basename(config.workspaceRoot),
           features: config.features,
           actions: advertisedActions(),
-          logSources: advertisedLogs()
+          logSources: advertisedLogs(),
+          codexSessions
         }
       });
 

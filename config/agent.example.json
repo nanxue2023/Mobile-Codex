@@ -36,6 +36,8 @@
   "codex": {
     "model": "",
     "extraArgs": [],
-    "writeModeDefaultsToOff": true
+    "writeModeDefaultsToOff": true,
+    "sessionListLimit": 12,
+    "sessionCatalogTtlMs": 30000
   }
 }

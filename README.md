@@ -9,6 +9,7 @@ This project is a security-first MVP for running Codex from your phone without e
 ## ✨ What It Does
 
 - Submit `codex exec` tasks from a phone-friendly web UI
+- Browse recent Codex sessions from the selected agent and continue one safely
 - Run predefined safe actions by id
 - Read predefined log sources by id
 - Pair and revoke agents from the browser
@@ -29,6 +30,10 @@ This project is a security-first MVP for running Codex from your phone without e
 - `codexExecWrite` disabled by default
 - Agent only needs outbound access to the relay
 - Feature flags enforced on both relay and agent
+- Relay disk state stores metadata only; task details can stay on the user's device
+- Codex session previews are sourced on the agent, kept in relay memory only, and may be cached in the browser
+- Session browsing is limited to Codex sessions whose CWD stays under the configured `workspaceRoot`
+- Resume mode defaults to read-only continuation; write-mode resume is blocked
 
 ## 🚀 Quick Start
 

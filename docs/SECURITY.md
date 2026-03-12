@@ -16,6 +16,11 @@ Assume:
 - Agent pairing uses short-lived one-time pairing codes.
 - Agent tokens can be revoked from the web UI.
 - Relay and agent both enforce feature flags.
+- Relay persists only minimal task metadata to disk. Prompt text, task output, diff text, and result bodies are kept out of `state.json`.
+- Task details can be cached locally in the browser on the user's device instead of on the relay.
+- Codex session catalogs and preview snippets are collected on the agent and stay out of relay disk state.
+- Codex session browsing is limited to sessions whose recorded CWD stays under the configured `workspaceRoot`.
+- Resume-mode Codex tasks block autonomous write mode by default.
 - The agent exposes predefined actions and predefined log sources, not arbitrary command lines or paths.
 - `codex_exec` write mode is disabled by default.
 - Diff snippets are capped in size before being returned to the phone.
@@ -42,6 +47,7 @@ These are not implemented in the MVP and should be considered before broader use
 - Signed audit export
 - Content scanning for secrets before log or diff return
 - Replay protection beyond token expiry and revocation
+- Per-user encrypted local browser caches
 
 ## Incident Response
 
@@ -52,3 +58,4 @@ If you suspect compromise:
 3. Rotate `bootstrapAdminTokenHash` and `tokenSecret`.
 4. Delete relay state in `data/relay/state.json` after preserving it for analysis.
 5. Re-pair agents with new pairing codes.
+6. Clear local browser storage on any device that cached task details.

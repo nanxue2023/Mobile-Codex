@@ -30,6 +30,8 @@ const config = loaded.value;
 const dataDir = path.resolve(loaded.dir, config.dataDir || "./data/relay");
 const statePath = path.join(dataDir, "state.json");
 const headers = defaultHeaders(config.publicOrigin || "");
+const terminalTaskStatuses = new Set(["completed", "failed", "rejected", "interrupted"]);
+const sensitiveTaskFields = ["prompt", "summary", "outputTail", "diffText", "result", "error"];
 
 ensureDir(dataDir);
 
@@ -40,12 +42,34 @@ const state = loadJson(statePath, {
   agents: {},
   tasks: {}
 });
+const volatileTaskData = new Map();
+const volatileAgentData = new Map();
 
 const rateState = new Map();
 
 function persistState() {
   atomicWriteJson(statePath, state);
 }
+
+function normalizeLoadedState() {
+  const now = nowIso();
+  state.pairings ||= {};
+  state.agents ||= {};
+  state.tasks ||= {};
+
+  for (const task of Object.values(state.tasks)) {
+    for (const field of sensitiveTaskFields) {
+      delete task[field];
+    }
+    if (!terminalTaskStatuses.has(task.status)) {
+      task.status = "interrupted";
+      task.updatedAt = now;
+    }
+  }
+}
+
+normalizeLoadedState();
+persistState();
 
 function cleanupState() {
   const now = Date.now();
@@ -111,6 +135,7 @@ function requireRole(req, res, expectedRole) {
 }
 
 function sanitizeAgent(agent) {
+  const volatile = volatileAgentData.get(agent.agentId) || {};
   return {
     agentId: agent.agentId,
     label: agent.label,
@@ -120,11 +145,34 @@ function sanitizeAgent(agent) {
     features: agent.features || {},
     actions: agent.actions || [],
     logSources: agent.logSources || [],
-    workspaceRootName: agent.workspaceRootName || ""
+    workspaceRootName: agent.workspaceRootName || "",
+    codexSessions: Array.isArray(volatile.codexSessions) ? volatile.codexSessions : []
+  };
+}
+
+function sanitizeSessionPreviewItem(item) {
+  return {
+    role: item?.role === "assistant" ? "assistant" : "user",
+    text: clampText(String(item?.text || ""), 320),
+    timestamp: typeof item?.timestamp === "string" ? item.timestamp : nowIso()
+  };
+}
+
+function sanitizeSessionSummary(session) {
+  return {
+    sessionId: clampText(String(session?.sessionId || ""), 120),
+    title: clampText(String(session?.title || "Codex Session"), 180),
+    firstUserMessage: clampText(String(session?.firstUserMessage || ""), 240),
+    updatedAt: typeof session?.updatedAt === "string" ? session.updatedAt : nowIso(),
+    createdAt: typeof session?.createdAt === "string" ? session.createdAt : nowIso(),
+    cwd: clampText(String(session?.cwd || "."), 180),
+    source: clampText(String(session?.source || ""), 24),
+    preview: Array.isArray(session?.preview) ? session.preview.slice(-4).map(sanitizeSessionPreviewItem) : []
   };
 }
 
 function sanitizeTask(task) {
+  const volatile = volatileTaskData.get(task.taskId) || {};
   return {
     taskId: task.taskId,
     agentId: task.agentId,
@@ -137,15 +185,16 @@ function sanitizeTask(task) {
     approvedAt: task.approvedAt || null,
     rejectedAt: task.rejectedAt || null,
     writeAccess: !!task.writeAccess,
-    summary: task.summary || "",
-    prompt: task.prompt || "",
+    resumeSessionId: task.resumeSessionId || "",
+    summary: volatile.summary || "",
+    prompt: volatile.prompt || "",
     actionId: task.actionId || "",
     logSourceId: task.logSourceId || "",
     cwd: task.cwd || ".",
-    outputTail: task.outputTail || "",
-    result: task.result || null,
-    error: task.error || "",
-    diffText: task.diffText || ""
+    outputTail: volatile.outputTail || "",
+    result: volatile.result || null,
+    error: volatile.error || "",
+    diffText: volatile.diffText || ""
   };
 }
 
@@ -244,26 +293,30 @@ function createTask(body, res) {
 
   const taskId = randomId("task");
   const createdAt = nowIso();
+  const resumeSessionId = body.type === "codex_exec" ? String(body.resumeSessionId || "").slice(0, 120) : "";
   state.tasks[taskId] = {
     taskId,
     agentId: body.agentId,
     type: body.type,
     title: body.title || body.type,
-    prompt: body.prompt || "",
     actionId: body.actionId || "",
     logSourceId: body.logSourceId || "",
+    resumeSessionId,
     cwd: body.cwd || ".",
     writeAccess,
     needsApproval: taskNeedsApproval(body.type),
     status: taskNeedsApproval(body.type) ? "awaiting_approval" : "queued",
+    createdAt,
+    updatedAt: createdAt
+  };
+  volatileTaskData.set(taskId, {
+    prompt: body.prompt || "",
     summary: "",
     outputTail: "",
     diffText: "",
     result: null,
-    error: "",
-    createdAt,
-    updatedAt: createdAt
-  };
+    error: ""
+  });
   persistState();
   sendJson(res, 201, { ok: true, task: sanitizeTask(state.tasks[taskId]) }, headers);
 }
@@ -294,21 +347,30 @@ function handleTaskUpdate(task, body, agentPayload, res) {
     task.status = body.status;
   }
   task.updatedAt = nowIso();
+  const volatile = volatileTaskData.get(task.taskId) || {
+    prompt: "",
+    summary: "",
+    outputTail: "",
+    diffText: "",
+    result: null,
+    error: ""
+  };
   if (typeof body.summary === "string") {
-    task.summary = clampText(body.summary, 2048);
+    volatile.summary = clampText(body.summary, 2048);
   }
   if (typeof body.outputAppend === "string") {
-    task.outputTail = clampText(`${task.outputTail || ""}${body.outputAppend}`, 12000);
+    volatile.outputTail = clampText(`${volatile.outputTail || ""}${body.outputAppend}`, 12000);
   }
   if (typeof body.diffText === "string") {
-    task.diffText = clampText(body.diffText, 20000);
+    volatile.diffText = clampText(body.diffText, 20000);
   }
   if (body.result && typeof body.result === "object") {
-    task.result = body.result;
+    volatile.result = body.result;
   }
   if (typeof body.error === "string") {
-    task.error = clampText(body.error, 4000);
+    volatile.error = clampText(body.error, 4000);
   }
+  volatileTaskData.set(task.taskId, volatile);
   persistState();
   sendJson(res, 200, { ok: true }, headers);
 }
@@ -390,6 +452,7 @@ const server = http.createServer(async (req, res) => {
         logSources: [],
         workspaceRootName: ""
       };
+      volatileAgentData.set(agentId, { codexSessions: [] });
       pairing.usedAt = nowIso();
       persistState();
       sendJson(res, 200, { ok: true, token }, headers);
@@ -489,6 +552,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       agent.revokedAt = nowIso();
+      volatileAgentData.delete(agent.agentId);
       persistState();
       sendJson(res, 200, { ok: true }, headers);
       return;
@@ -499,7 +563,7 @@ const server = http.createServer(async (req, res) => {
       if (!agentPayload) {
         return;
       }
-      const body = await readJsonBody(req, 16384);
+      const body = await readJsonBody(req, 131072);
       const agent = state.agents[agentPayload.sub];
       agent.lastSeenAt = nowIso();
       agent.label = String(body.label || agent.label || agent.agentId).slice(0, 120);
@@ -507,6 +571,9 @@ const server = http.createServer(async (req, res) => {
       agent.features = body.features || {};
       agent.actions = Array.isArray(body.actions) ? body.actions.slice(0, 50) : [];
       agent.logSources = Array.isArray(body.logSources) ? body.logSources.slice(0, 50) : [];
+      volatileAgentData.set(agent.agentId, {
+        codexSessions: Array.isArray(body.codexSessions) ? body.codexSessions.slice(0, 20).map(sanitizeSessionSummary) : []
+      });
       persistState();
 
       const tasks = Object.values(state.tasks)

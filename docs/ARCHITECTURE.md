@@ -11,6 +11,7 @@ Give a phone-friendly control plane for Codex tasks without requiring direct mob
 3. The phone opens the `web` PWA from the relay and authenticates with a bootstrap token.
 4. The PWA creates tasks on the relay.
 5. The agent polls for queued tasks, executes locally, then pushes back status, logs, and diff snippets.
+6. The relay persists only task metadata; sensitive task content is kept in memory and can be cached locally on the user's device.
 
 ## Security Boundaries
 
@@ -19,6 +20,7 @@ Give a phone-friendly control plane for Codex tasks without requiring direct mob
 - The agent never executes arbitrary text as shell by default.
 - Actions and log reads are predefined in `agent.local.json`.
 - `codex_exec` write mode is disabled by default on both relay and agent.
+- Relay disk state is intentionally narrower than the UI-visible state.
 
 ## Why This Shape
 

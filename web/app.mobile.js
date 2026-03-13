@@ -486,6 +486,20 @@ const langButtons = [
   document.querySelector("#lang-zh")
 ];
 
+const tabBar = document.querySelector("#tab-bar");
+const tabButtons = Array.from(document.querySelectorAll(".tab-button[data-tab]"));
+const screenSections = {
+  ask: document.querySelector("#screen-ask"),
+  sessions: document.querySelector("#screen-sessions"),
+  agents: document.querySelector("#screen-agents"),
+  more: document.querySelector("#screen-more")
+};
+const sessionsScreenContent = document.querySelector("#sessions-screen-content");
+const agentsScreenContent = document.querySelector("#agents-screen-content");
+const moreScreenContent = document.querySelector("#more-screen-content");
+const agentsTabBadge = document.querySelector("#agents-tab-badge");
+const moreTabBadge = document.querySelector("#more-tab-badge");
+
 function bytesToBase64Url(value) {
   const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
   let text = "";
@@ -1168,6 +1182,12 @@ function setActiveTab(tab) {
   state.overlay = null;
   state.swipedSessionId = "";
   localStorage.setItem(activeTabStorageKey, state.activeTab);
+  for (const button of tabButtons) {
+    button.classList.toggle("active", button.dataset.tab === state.activeTab);
+  }
+  for (const [key, section] of Object.entries(screenSections)) {
+    section.classList.toggle("active", key === state.activeTab);
+  }
   render();
   replaceHistoryRoute();
 }
@@ -1201,6 +1221,7 @@ function showDashboard(visible) {
   hero.classList.toggle("hidden", visible);
   loginPanel.classList.toggle("hidden", visible);
   dashboard.classList.toggle("hidden", !visible);
+  tabBar.classList.toggle("hidden", !visible);
   if (visible) {
     replaceHistoryRoute();
   } else {
@@ -1309,7 +1330,9 @@ function render() {
   });
   syncTaskSelectors();
   renderAsk();
-  renderAgents();
+  renderSessionsScreen();
+  renderAgentsScreen();
+  renderMoreScreen();
   renderBadges();
   renderOverlay();
   updateKeyboardState();
@@ -1317,8 +1340,15 @@ function render() {
 
 function renderBadges() {
   const needsEnrollment = !!state.data?.auth?.needsPasskeyEnrollment;
+  const pendingPairs = (state.data?.pendingPairRequests || []).length;
   moreBadge.classList.toggle("hidden", !needsEnrollment);
   moreBadge.textContent = needsEnrollment ? "•" : "";
+  if (agentsTabBadge) {
+    agentsTabBadge.classList.toggle("hidden", pendingPairs === 0);
+  }
+  if (moreTabBadge) {
+    moreTabBadge.classList.toggle("hidden", !needsEnrollment);
+  }
 }
 
 function renderAsk() {
@@ -1332,6 +1362,47 @@ function renderAsk() {
 function renderAgents() {
   const pending = state.data?.pendingPairRequests || [];
   priorityEventsEl.innerHTML = pending.length ? pending.map(pairRequestCard).join("") : emptyState(t("noPendingDevices"));
+}
+
+function renderSessionsScreen() {
+  if (!sessionsScreenContent) return;
+  sessionsScreenContent.innerHTML = sessionsDrawerHtml();
+}
+
+function renderAgentsScreen() {
+  if (!agentsScreenContent) return;
+  const agents = (state.data?.agents || []).filter(a => !a.revokedAt);
+  const pending = state.data?.pendingPairRequests || [];
+  const permissions = currentPermissions();
+  agentsScreenContent.innerHTML = `
+    <section class="section-block">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${escapeHtml(t("agentsEyebrow"))}</p>
+          <h3>${escapeHtml(t("agentsTitle"))}</h3>
+        </div>
+        ${permissions.pairAgents ? `<button type="button" class="secondary" data-open-sheet="pair">${escapeHtml(t("pairNewAgent"))}</button>` : ""}
+      </div>
+      <p class="hint">${escapeHtml(t("pairSummary", { agents: agents.length, pending: pending.length }))}</p>
+      <div style="margin-top:12px;">${agents.length ? agents.map(agentCard).join("") : emptyState(t("noAgents"))}</div>
+    </section>
+    ${pending.length ? `
+      <section class="section-block">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow">${escapeHtml(t("approvalsEyebrow"))}</p>
+            <h3>${escapeHtml(t("pendingDevices"))}</h3>
+          </div>
+        </div>
+        <div>${pending.map(pairRequestCard).join("")}</div>
+      </section>
+    ` : ""}
+  `;
+}
+
+function renderMoreScreen() {
+  if (!moreScreenContent) return;
+  moreScreenContent.innerHTML = controlPanelHtml();
 }
 
 function filteredSessions() {
@@ -2165,6 +2236,140 @@ function bindGlobalEvents() {
   logoutButton.addEventListener("click", () => {
     logout().catch(() => {});
   });
+
+  for (const button of tabButtons) {
+    button.addEventListener("click", () => {
+      if (button.dataset.tab) {
+        setActiveTab(button.dataset.tab);
+      }
+    });
+  }
+
+  // Delegate clicks on Sessions/Agents/More screen content areas
+  for (const container of [sessionsScreenContent, agentsScreenContent, moreScreenContent]) {
+    if (!container) continue;
+
+    container.addEventListener("click", async (event) => {
+      try {
+        const panelTrigger = event.target.closest("[data-open-panel]");
+        if (panelTrigger) {
+          const target = panelTrigger.dataset.openPanel;
+          if (target === "workspace" || target === "access" || target === "context" || target === "sessions" || target === "control") {
+            openPanel(target);
+            return;
+          }
+          if (target === "agent-current") {
+            openPanel("agent", { agentId: state.selectedAgentId });
+            return;
+          }
+        }
+        const sheetTrigger = event.target.closest("[data-open-sheet]");
+        if (sheetTrigger?.dataset.openSheet === "pair") {
+          openSheet("pair");
+          return;
+        }
+        const openAgentId = event.target.getAttribute("data-open-agent");
+        if (openAgentId) {
+          openPanel("agent", { agentId: openAgentId });
+          return;
+        }
+        const approvePairId = event.target.getAttribute("data-approve-pair");
+        if (approvePairId) {
+          await api(`/api/admin/pair-requests/${approvePairId}/approve`, { method: "POST" });
+          await refresh();
+          return;
+        }
+        const rejectPairId = event.target.getAttribute("data-reject-pair");
+        if (rejectPairId) {
+          await api(`/api/admin/pair-requests/${rejectPairId}/reject`, { method: "POST" });
+          await refresh();
+          return;
+        }
+        const setLocaleValue = event.target.getAttribute("data-set-locale");
+        if (setLocaleValue) {
+          setLocale(setLocaleValue);
+          return;
+        }
+        const wantsClearCache = event.target.hasAttribute("data-clear-cache");
+        if (wantsClearCache) {
+          state.taskCache = {};
+          state.sessionCache = {};
+          clearLegacySensitiveStorage();
+          sessionStorage.removeItem(taskCacheKey);
+          sessionStorage.removeItem(sessionCacheKey);
+          render();
+          return;
+        }
+
+        // session card click in sessions screen
+        const sessionContent = event.target.closest(".session-card-content");
+        if (sessionContent) {
+          const sessionId = sessionContent.dataset.sessionId;
+          if (state.swipedSessionId === sessionId) {
+            state.swipedSessionId = "";
+            render();
+            return;
+          }
+          if (gesture?.moved) return;
+          openPanel("session", { sessionId });
+          return;
+        }
+        const deleteSessionId = event.target.getAttribute("data-delete-session");
+        if (deleteSessionId) {
+          await handleDeleteSession(deleteSessionId);
+          return;
+        }
+      } catch (error) {
+        alert(String(error.message || error));
+      }
+    });
+
+    container.addEventListener("change", (event) => {
+      if (event.target.id === "panel-session-filter" || event.target.id === "screen-session-filter") {
+        state.sessionFilter = event.target.value;
+        render();
+      } else if (event.target.id === "context-agent-id") {
+        state.selectedAgentId = event.target.value;
+        clearSelectedSession();
+        render();
+      } else if (event.target.id === "context-workspace-id" && event.target.value) {
+        switchWorkspace(event.target.value).catch((error) => alert(String(error.message || error)));
+      } else if (event.target.id === "invite-type") {
+        state.inviteType = event.target.value;
+        render();
+      }
+    });
+
+    container.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      try {
+        if (event.target.id === "workspace-form") {
+          await createWorkspace(event.target.querySelector("#workspace-name").value.trim());
+          event.target.reset();
+        } else if (event.target.id === "join-workspace-form") {
+          await redeemInvite(event.target.querySelector("#join-invite-code").value.trim());
+        } else if (event.target.id === "invite-form") {
+          const type = event.target.querySelector("#invite-type").value;
+          await createInvite(
+            type,
+            event.target.querySelector("#invite-role")?.value || "viewer",
+            Number(event.target.querySelector("#invite-ttl").value || 86400),
+            event.target.querySelector("#invite-note").value.trim()
+          );
+        } else if (event.target.id === "passkey-form") {
+          await registerPasskey(event.target.querySelector("#passkey-label").value.trim());
+        }
+      } catch (error) {
+        alert(String(error.message || error));
+      }
+    });
+
+    // Swipe support for sessions screen
+    container.addEventListener("pointerdown", (event) => { startSwipe(event); });
+    container.addEventListener("pointermove", (event) => { moveSwipe(event); });
+    container.addEventListener("pointerup", (event) => { endSwipe(event); });
+    container.addEventListener("pointercancel", (event) => { endSwipe(event); });
+  }
 
   taskTypeButtons.forEach((button) => {
     button.addEventListener("click", () => {

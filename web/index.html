@@ -85,33 +85,15 @@
         <header class="shell-header">
           <div class="shell-copy">
             <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
-            <h2 id="workspace-title">Current Workspace</h2>
-            <p id="status-line" class="hint">Connecting…</p>
+            <h2 data-i18n="appTitle">Mobile Codex</h2>
           </div>
           <div class="shell-tools">
-            <div class="locale-switch inline" role="group" aria-label="Language">
-              <button id="dash-lang-en" type="button" class="locale-button active">EN</button>
-              <button id="dash-lang-zh" type="button" class="locale-button">中文</button>
-            </div>
             <div class="header-actions">
               <button id="refresh-button" type="button" class="secondary" data-i18n="refresh">Refresh</button>
               <button id="logout-button" type="button" class="secondary" data-i18n="logout">Logout</button>
             </div>
           </div>
         </header>
-
-        <section class="context-strip">
-          <label class="select-card">
-            <span data-i18n="workspace">Workspace</span>
-            <select id="workspace-id"></select>
-          </label>
-          <label class="select-card">
-            <span data-i18n="agent">Agent</span>
-            <select id="agent-id"></select>
-          </label>
-        </section>
-
-        <p id="current-user-line" class="current-user-line">Signed out.</p>
 
         <section class="screen-stack">
           <section id="screen-ask" class="screen active" data-screen="ask">
@@ -233,6 +215,30 @@
                 <h3 data-i18n="moreTitle">Workspace And Access</h3>
               </div>
             </div>
+            <section class="section-block">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
+                  <h3 id="workspace-title" data-i18n="currentWorkspace">Current Workspace</h3>
+                </div>
+                <div class="locale-switch inline" role="group" aria-label="Language">
+                  <button id="more-lang-en" type="button" class="locale-button active">EN</button>
+                  <button id="more-lang-zh" type="button" class="locale-button">中文</button>
+                </div>
+              </div>
+              <p id="status-line" class="hint">Connecting…</p>
+              <p id="current-user-line" class="current-user-line">Signed out.</p>
+              <div class="context-strip context-strip-more">
+                <label class="select-card">
+                  <span data-i18n="workspace">Workspace</span>
+                  <select id="workspace-id"></select>
+                </label>
+                <label class="select-card">
+                  <span data-i18n="agent">Agent</span>
+                  <select id="agent-id"></select>
+                </label>
+              </div>
+            </section>
             <div class="menu-stack">
               <button type="button" class="menu-card" data-open-panel="workspace">
                 <strong data-i18n="workspaceTitle">Workspace</strong>

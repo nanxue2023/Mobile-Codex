@@ -355,8 +355,7 @@ h3 {
 }
 
 .shell-copy h2,
-.shell-copy .hint,
-.current-user-line {
+.shell-copy .hint {
   color: #ffffff;
 }
 
@@ -395,6 +394,11 @@ h3 {
 .current-user-line {
   margin: 0 4px;
   min-height: 24px;
+  color: #666973;
+}
+
+.context-strip-more {
+  margin-top: 14px;
 }
 
 .screen {

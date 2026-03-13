@@ -430,6 +430,7 @@ const state = {
 
 let gesture = null;
 
+const hero = document.querySelector(".hero");
 const loginPanel = document.querySelector("#login-panel");
 const dashboard = document.querySelector("#dashboard");
 const passkeyLoginBox = document.querySelector("#passkey-login-box");
@@ -488,8 +489,8 @@ const closeSheetButton = document.querySelector("#close-sheet-button");
 const langButtons = [
   document.querySelector("#lang-en"),
   document.querySelector("#lang-zh"),
-  document.querySelector("#dash-lang-en"),
-  document.querySelector("#dash-lang-zh")
+  document.querySelector("#more-lang-en"),
+  document.querySelector("#more-lang-zh")
 ];
 
 function bytesToBase64Url(value) {
@@ -1205,6 +1206,7 @@ function closeOverlay(options = {}) {
 }
 
 function showDashboard(visible) {
+  hero.classList.toggle("hidden", visible);
   loginPanel.classList.toggle("hidden", visible);
   dashboard.classList.toggle("hidden", !visible);
   if (visible) {
@@ -2056,8 +2058,8 @@ async function handleDeleteSession(sessionId) {
 function bindGlobalEvents() {
   document.querySelector("#lang-en").addEventListener("click", () => setLocale("en"));
   document.querySelector("#lang-zh").addEventListener("click", () => setLocale("zh"));
-  document.querySelector("#dash-lang-en").addEventListener("click", () => setLocale("en"));
-  document.querySelector("#dash-lang-zh").addEventListener("click", () => setLocale("zh"));
+  document.querySelector("#more-lang-en").addEventListener("click", () => setLocale("en"));
+  document.querySelector("#more-lang-zh").addEventListener("click", () => setLocale("zh"));
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();

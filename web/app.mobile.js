@@ -160,6 +160,9 @@ const translations = {
     approveDevice: "Approve Device",
     reject: "Reject",
     continueHere: "Continue Here",
+    loadConversation: "Load Conversation",
+    loadingConversation: "Loading conversation…",
+    conversationMessages: "{count} message(s)",
     selected: "Selected",
     delete: "Delete",
     passkeyDefault: "Passkey",
@@ -169,6 +172,13 @@ const translations = {
     transportsLabel: "Transports: {transports}",
     noWorkspaceSelectedHint: "Create or join a workspace to start working.",
     pairSummary: "{agents} agent(s) · {pending} pending approval(s)",
+    statusRegistered: "Registered",
+    statusOnline: "Online",
+    statusStale: "Stale",
+    statusRevoked: "Revoked",
+    statusPending: "Pending",
+    revokeAgent: "Revoke Agent",
+    revokeAgentConfirm: "Revoke this agent? The current token will stop working and the same agentId can be paired again.",
     passkeysSummary: "{count} passkey(s) on this account. Recovery token remains available only for the relay owner.",
     passkeysUnavailable: "Passkeys are unavailable here. Check HTTPS/publicOrigin and passkey configuration.",
     passkeyNoBrowser: "This browser cannot use passkeys here. Use Safari/Chrome on a secure origin, or fall back to the recovery token.",
@@ -349,6 +359,9 @@ const translations = {
     approveDevice: "批准设备",
     reject: "拒绝",
     continueHere: "在这里继续",
+    loadConversation: "查看对话",
+    loadingConversation: "正在加载对话…",
+    conversationMessages: "{count} 条消息",
     selected: "已选择",
     delete: "删除",
     passkeyDefault: "Passkey",
@@ -358,6 +371,13 @@ const translations = {
     transportsLabel: "传输方式：{transports}",
     noWorkspaceSelectedHint: "先创建或加入一个工作区，再开始工作。",
     pairSummary: "{agents} 个 agent · {pending} 个待批准",
+    statusRegistered: "已注册",
+    statusOnline: "在线",
+    statusStale: "离线",
+    statusRevoked: "已撤销",
+    statusPending: "待批准",
+    revokeAgent: "撤销 Agent",
+    revokeAgentConfirm: "要撤销这个 agent 吗？当前 token 会失效，之后可以重新用同一个 agentId 配对。",
     passkeysSummary: "当前账号已有 {count} 个 passkey。Bootstrap Token 仅保留给 relay owner 作为恢复入口。",
     passkeysUnavailable: "当前环境无法使用 passkey，请检查 HTTPS/publicOrigin 和 passkey 配置。",
     passkeyNoBrowser: "当前浏览器无法在这里使用 passkey。请使用安全来源下的 Safari/Chrome，或暂时改用恢复口令。",
@@ -686,6 +706,36 @@ function currentPermissions() {
 
 function currentWorkspace() {
   return state.data?.currentWorkspace || null;
+}
+
+function agentStatus(agent) {
+  if (!agent) {
+    return "registered";
+  }
+  if (agent.revokedAt) {
+    return "revoked";
+  }
+  const pollInterval = Number(state.data?.web?.pollIntervalMs || 2500);
+  const staleAfterMs = Math.max(15000, pollInterval * 6);
+  const lastSeenAt = Date.parse(agent.lastSeenAt || agent.createdAt || "");
+  if (Number.isFinite(lastSeenAt) && Date.now() - lastSeenAt > staleAfterMs) {
+    return "stale";
+  }
+  return "online";
+}
+
+function agentStatusLabel(agent) {
+  const status = agentStatus(agent);
+  if (status === "online") {
+    return t("statusOnline");
+  }
+  if (status === "stale") {
+    return t("statusStale");
+  }
+  if (status === "revoked") {
+    return t("statusRevoked");
+  }
+  return t("statusRegistered");
 }
 
 function selectedAgent() {
@@ -1042,6 +1092,15 @@ async function revokeInvite(inviteId) {
   renderOverlay();
 }
 
+async function revokeAgent(agentId) {
+  await api(`/api/admin/agents/${encodeURIComponent(agentId)}/revoke`, { method: "POST" });
+  if (agentSelect.value === agentId) {
+    clearSelectedSession();
+  }
+  await refresh();
+  renderOverlay();
+}
+
 async function createPairing(note, ttlSec) {
   const result = await api("/api/admin/pairings", {
     method: "POST",
@@ -1180,7 +1239,7 @@ function renderWorkspaceSelect(auth) {
 }
 
 function renderAgentSelect(preferredAgentId = "") {
-  const agents = state.data?.agents || [];
+  const agents = (state.data?.agents || []).filter((agent) => !agent.revokedAt);
   const previousValue = preferredAgentId || agentSelect.value;
   agentSelect.innerHTML = "";
   for (const agent of agents) {
@@ -1294,8 +1353,14 @@ function renderSessions() {
 function renderAgents() {
   const pending = state.data?.pendingPairRequests || [];
   const agents = state.data?.agents || [];
+  const online = agents.filter((agent) => agentStatus(agent) === "online").length;
+  const stale = agents.filter((agent) => agentStatus(agent) === "stale").length;
+  const revoked = agents.filter((agent) => agentStatus(agent) === "revoked").length;
   agentsSummaryEl.innerHTML = `
     <div class="summary-pill">${escapeHtml(t("pairSummary", { agents: agents.length, pending: pending.length }))}</div>
+    <div class="summary-pill">${escapeHtml(`${t("statusOnline")} ${online}`)}</div>
+    <div class="summary-pill">${escapeHtml(`${t("statusStale")} ${stale}`)}</div>
+    ${revoked ? `<div class="summary-pill">${escapeHtml(`${t("statusRevoked")} ${revoked}`)}</div>` : ""}
     ${state.data?.auth?.needsPasskeyEnrollment ? `<div class="summary-pill">${escapeHtml(t("passkeyEnrollRequired"))}</div>` : ""}
   `;
   pairRequestsEl.innerHTML = pending.length ? pending.map(pairRequestCard).join("") : emptyState(t("noPendingDevices"));
@@ -1435,7 +1500,7 @@ function pairRequestCard(request) {
       <header>
         <div>
           <strong>${escapeHtml(request.label || request.agentId || t("pendingDevice"))}</strong>
-          <p>${escapeHtml(request.agentId)} · ${escapeHtml(request.hostname || t("unknownHost"))}</p>
+          <p>${escapeHtml(t("statusPending"))} · ${escapeHtml(request.agentId)} · ${escapeHtml(request.hostname || t("unknownHost"))}</p>
         </div>
         <div class="row-meta">${escapeHtml(formatDateTime(request.createdAt))}</div>
       </header>
@@ -1445,7 +1510,7 @@ function pairRequestCard(request) {
         canApprove
           ? `<div class="actions">
                <button type="button" data-approve-pair="${request.requestId}">${escapeHtml(t("approveDevice"))}</button>
-               <button type="button" class="secondary" data-reject-pair="${request.requestId}">${escapeHtml(t("reject"))}</button>
+               <button type="button" class="danger-action" data-reject-pair="${request.requestId}">${escapeHtml(t("reject"))}</button>
              </div>`
           : `<p class="task-summary">${escapeHtml(t("operatorsApprovePair"))}</p>`
       }
@@ -1454,12 +1519,13 @@ function pairRequestCard(request) {
 }
 
 function agentCard(agent) {
+  const statusLabel = agentStatusLabel(agent);
   return `
     <article class="agent-card">
       <header>
         <div>
           <strong>${escapeHtml(agent.label || agent.agentId)}</strong>
-          <p>${escapeHtml(agent.agentId)}</p>
+          <p>${escapeHtml(statusLabel)} · ${escapeHtml(agent.agentId)}</p>
         </div>
         <div class="row-meta">${escapeHtml(formatDateTime(agent.lastSeenAt || agent.createdAt))}</div>
       </header>
@@ -1725,9 +1791,35 @@ function sessionPanelHtml(session) {
     return emptyState(t("noSessions"));
   }
   const canContinue = currentPermissions().createTasks;
+  const canReadConversation = currentPermissions().createTasks;
+  const readTask = latestSessionReadTask(session.sessionId);
   const preview = (session.preview || [])
     .map((item) => `<div class="preview-line ${item.role === "assistant" ? "assistant" : "user"}"><strong>${escapeHtml(formatPreviewRole(item.role))}</strong> ${escapeHtml(item.text)}</div>`)
     .join("");
+  const messages = Array.isArray(readTask?.result?.messages) ? readTask.result.messages : [];
+  const conversationHtml =
+    readTask?.status === "queued" || readTask?.status === "running"
+      ? `<div class="empty-state">${escapeHtml(t("loadingConversation"))}</div>`
+      : messages.length
+        ? `
+            <section class="card" style="margin-top:12px;">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow">${escapeHtml(t("sessionEyebrow"))}</p>
+                  <h3>${escapeHtml(t("conversationMessages", { count: messages.length }))}</h3>
+                </div>
+              </div>
+              <div class="preview-stack">
+                ${messages
+                  .map(
+                    (item) =>
+                      `<div class="preview-line ${item.role === "assistant" ? "assistant" : "user"}"><strong>${escapeHtml(formatPreviewRole(item.role))}</strong> ${escapeHtml(item.text)}</div>`
+                  )
+                  .join("")}
+              </div>
+            </section>
+          `
+        : "";
   return `
     <section class="card session-detail-card">
       <header>
@@ -1740,14 +1832,16 @@ function sessionPanelHtml(session) {
       ${session.firstUserMessage ? `<p class="task-body">${escapeHtml(session.firstUserMessage)}</p>` : ""}
       <div class="preview-stack">${preview || `<div class="preview-line">${escapeHtml(t("noPreview"))}</div>`}</div>
       ${
-        canContinue
+        canContinue || canReadConversation
           ? `<div class="actions">
-               <button type="button" data-continue-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("continueHere"))}</button>
+               ${canContinue ? `<button type="button" data-continue-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("continueHere"))}</button>` : ""}
+               ${canReadConversation ? `<button type="button" class="secondary" data-read-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("loadConversation"))}</button>` : ""}
                <button type="button" class="danger-action" data-delete-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("delete"))}</button>
              </div>`
           : `<p class="task-summary">${escapeHtml(t("operatorsContinueDelete"))}</p>`
       }
     </section>
+    ${conversationHtml}
   `;
 }
 
@@ -1755,6 +1849,7 @@ function agentPanelHtml(agent) {
   if (!agent) {
     return emptyState(t("noAgents"));
   }
+  const canRevoke = currentPermissions().revokeAgents && !agent.revokedAt;
   const actions = agent.actions?.length
     ? agent.actions.map((action) => `<div class="membership-row"><span>${escapeHtml(action.label || action.id)}</span><span>${escapeHtml(action.id)}</span></div>`).join("")
     : `<p class="hint">${escapeHtml(t("taskTypeAction"))}: 0</p>`;
@@ -1766,12 +1861,13 @@ function agentPanelHtml(agent) {
       <header>
         <div>
           <strong>${escapeHtml(agent.label || agent.agentId)}</strong>
-          <p>${escapeHtml(agent.agentId)}</p>
+          <p>${escapeHtml(agentStatusLabel(agent))} · ${escapeHtml(agent.agentId)}</p>
         </div>
         <div class="row-meta">${escapeHtml(formatDateTime(agent.lastSeenAt || agent.createdAt))}</div>
       </header>
       ${agent.workspaceRootName ? `<p class="task-summary">${escapeHtml(t("workspaceLabel", { workspace: agent.workspaceRootName }))}</p>` : ""}
       <p class="task-summary">${escapeHtml(`Actions ${agent.actions?.length || 0} · Logs ${agent.logSources?.length || 0}`)}</p>
+      ${canRevoke ? `<div class="actions"><button type="button" class="danger-action" data-revoke-agent="${escapeHtml(agent.agentId)}">${escapeHtml(t("revokeAgent"))}</button></div>` : ""}
     </section>
     <section class="card">
       <div class="section-head compact">
@@ -1834,6 +1930,12 @@ function findSessionById(sessionId) {
 
 function findAgentById(agentId) {
   return (state.data?.agents || []).find((agent) => agent.agentId === agentId) || null;
+}
+
+function latestSessionReadTask(sessionId) {
+  return (state.data?.tasks || [])
+    .filter((task) => task.type === "read_session" && task.sessionId === sessionId && task.agentId === agentSelect.value)
+    .sort((left, right) => Date.parse(right.updatedAt || right.createdAt || "") - Date.parse(left.updatedAt || left.createdAt || ""))[0] || null;
 }
 
 function removeSessionFromLocalState(agentId, sessionId) {
@@ -2187,7 +2289,9 @@ function bindGlobalEvents() {
   panelContent.addEventListener("click", async (event) => {
     try {
       const continueSessionId = event.target.getAttribute("data-continue-session");
+      const readSessionId = event.target.getAttribute("data-read-session");
       const deleteSessionId = event.target.getAttribute("data-delete-session");
+      const revokeAgentId = event.target.getAttribute("data-revoke-agent");
       const revokePasskeyId = event.target.getAttribute("data-revoke-passkey");
       const revokeInviteId = event.target.getAttribute("data-revoke-invite");
       const recoveryUserId = event.target.getAttribute("data-create-user-recovery");
@@ -2205,8 +2309,25 @@ function bindGlobalEvents() {
         taskPrompt.focus();
         return;
       }
+      if (readSessionId) {
+        await submitTask({
+          agentId: agentSelect.value,
+          type: "read_session",
+          title: t("loadConversation"),
+          sessionId: readSessionId
+        });
+        renderOverlay();
+        return;
+      }
       if (deleteSessionId) {
         await handleDeleteSession(deleteSessionId);
+        return;
+      }
+      if (revokeAgentId) {
+        if (!confirm(t("revokeAgentConfirm"))) {
+          return;
+        }
+        await revokeAgent(revokeAgentId);
         return;
       }
       if (revokePasskeyId) {

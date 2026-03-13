@@ -1118,14 +1118,14 @@ function activeOwnerCountForWorkspace(workspaceId) {
 }
 
 function taskNeedsApproval(type) {
-  if (type === "codex_exec" || type === "delete_session") {
+  if (type === "codex_exec" || type === "delete_session" || type === "read_session") {
     return false;
   }
   return true;
 }
 
 function createTask(body, context, res) {
-  const allowedTypes = new Set(["codex_exec", "run_action", "read_log", "delete_session"]);
+  const allowedTypes = new Set(["codex_exec", "run_action", "read_log", "delete_session", "read_session"]);
   if (!allowedTypes.has(body.type)) {
     sendJson(res, 400, { error: "unsupported-task-type" }, headers);
     return;
@@ -1140,6 +1140,10 @@ function createTask(body, context, res) {
     return;
   }
   if (body.type === "read_log" && !config.features.readLog) {
+    sendJson(res, 403, { error: "feature-disabled" }, headers);
+    return;
+  }
+  if (body.type === "read_session" && config.features.readSession === false) {
     sendJson(res, 403, { error: "feature-disabled" }, headers);
     return;
   }
@@ -1166,7 +1170,7 @@ function createTask(body, context, res) {
   const taskId = randomId("task");
   const createdAt = nowIso();
   const resumeSessionId = body.type === "codex_exec" ? clampText(String(body.resumeSessionId || ""), 120) : "";
-  const sessionId = body.type === "delete_session" ? clampText(String(body.sessionId || ""), 120) : "";
+  const sessionId = body.type === "delete_session" || body.type === "read_session" ? clampText(String(body.sessionId || ""), 120) : "";
   state.tasks[taskId] = {
     taskId,
     workspaceId: context.workspaceId,

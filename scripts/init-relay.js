@@ -94,6 +94,7 @@ async function main() {
       features: {
         pairings: true,
         codexExec: true,
+        readSession: true,
         deleteSession: true,
         codexExecWrite: false,
         runAction: true,

@@ -10,6 +10,7 @@ const args = parseArgs(process.argv);
 const configPath = args.config || path.resolve(process.cwd(), "config/agent.local.json");
 const loaded = loadConfig(configPath);
 const config = loaded.value;
+config.workspaceRoot = path.resolve(loaded.dir, String(config.workspaceRoot || "."));
 const agentRuntimeState = {
   agentToken: "",
   sessionCatalog: {
@@ -116,6 +117,42 @@ function migrateLegacyAgentToken() {
     console.warn(
       `[agent] warning: could not migrate legacy agent token into ${resolveAgentTokenFile()}: ${String(error.message || error)}`
     );
+  }
+}
+
+function validateWorkspaceRoot() {
+  const target = String(config.workspaceRoot || "").trim();
+  if (!target) {
+    throw new Error("invalid-workspace-root:missing");
+  }
+
+  if (!fs.existsSync(target)) {
+    throw new Error(`invalid-workspace-root:not-found:${target}`);
+  }
+
+  let stats;
+  try {
+    stats = fs.statSync(target);
+  } catch (error) {
+    throw new Error(`invalid-workspace-root:unreadable-metadata:${String(error.message || error)}`);
+  }
+
+  if (!stats.isDirectory()) {
+    throw new Error(`invalid-workspace-root:not-directory:${target}`);
+  }
+
+  try {
+    fs.accessSync(target, fs.constants.R_OK);
+  } catch {
+    throw new Error(`invalid-workspace-root:not-readable:${target}`);
+  }
+
+  if (config.features?.codexExecWrite) {
+    try {
+      fs.accessSync(target, fs.constants.W_OK);
+    } catch {
+      throw new Error(`invalid-workspace-root:not-writable:${target}`);
+    }
   }
 }
 
@@ -314,6 +351,60 @@ async function readSessionPreview(rolloutPath) {
   }
 
   return previews.slice(-4);
+}
+
+async function readSessionConversation(rolloutPath) {
+  const sessionsRoot = getCodexSessionsRoot();
+  const resolvedPath = path.resolve(rolloutPath);
+  if (!resolvedPath.startsWith(`${sessionsRoot}${path.sep}`)) {
+    return [];
+  }
+
+  const limit = Math.max(4, Math.min(Number(config.codex?.sessionReadMessageLimit || 24), 80));
+  const messages = [];
+  const stream = fs.createReadStream(resolvedPath, { encoding: "utf8" });
+  const lines = readline.createInterface({
+    input: stream,
+    crlfDelay: Infinity
+  });
+
+  try {
+    for await (const line of lines) {
+      if (!line) {
+        continue;
+      }
+      let parsed;
+      try {
+        parsed = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (parsed.type !== "response_item" || parsed.payload?.type !== "message") {
+        continue;
+      }
+      const role = parsed.payload.role;
+      if (role !== "user" && role !== "assistant") {
+        continue;
+      }
+      const text = extractMessageText(role, parsed.payload.content);
+      if (!text) {
+        continue;
+      }
+      messages.push({
+        role,
+        text,
+        timestamp: parsed.timestamp || nowIso()
+      });
+      if (messages.length > limit) {
+        messages.shift();
+      }
+    }
+  } finally {
+    lines.close();
+    stream.destroy();
+  }
+
+  return messages;
 }
 
 async function loadCodexSessions() {
@@ -636,6 +727,11 @@ async function lookupSessionForDeletion(sessionId) {
   };
 }
 
+async function lookupSessionForRead(sessionId) {
+  const session = await lookupSessionForDeletion(sessionId);
+  return session;
+}
+
 function pruneEmptySessionParents(targetPath, rootPath) {
   let current = path.dirname(targetPath);
   const resolvedRoot = path.resolve(rootPath);
@@ -709,6 +805,8 @@ async function handleTask(task) {
       outcome = await runCodexExec(task);
     } else if (task.type === "delete_session") {
       outcome = await deleteCodexSession(task);
+    } else if (task.type === "read_session") {
+      outcome = await runReadSession(task);
     } else if (task.type === "run_action") {
       outcome = await runAction(task);
     } else if (task.type === "read_log") {
@@ -725,6 +823,31 @@ async function handleTask(task) {
       summary: "Task failed"
     });
   }
+}
+
+async function runReadSession(task) {
+  if (!config.features?.codexExec || config.features?.readSession === false) {
+    throw new Error("read-session-disabled-locally");
+  }
+  const session = await lookupSessionForRead(task.sessionId);
+  const messages = await readSessionConversation(session.rolloutPath);
+  const transcript = messages
+    .map((item) => `[${item.role}] ${item.text}`)
+    .join("\n\n");
+  return {
+    status: "completed",
+    summary: clampText(session.title || task.sessionId || "session conversation", 2000),
+    result: {
+      sessionId: task.sessionId,
+      title: session.title,
+      cwd: path.relative(config.workspaceRoot, session.cwd || config.workspaceRoot) || ".",
+      messageCount: messages.length,
+      messages,
+      completedAt: nowIso()
+    },
+    outputAppend: clampText(transcript, config.maxTaskLogBytes || 12000),
+    error: ""
+  };
 }
 
 async function pollLoop() {
@@ -756,6 +879,7 @@ async function pollLoop() {
 
 async function main() {
   loadJson(loaded.path, config);
+  validateWorkspaceRoot();
   loadAgentToken();
   migrateLegacyAgentToken();
   loadAgentToken();

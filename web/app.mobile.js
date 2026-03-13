@@ -30,6 +30,7 @@ const translations = {
     userRecoveryHint: "If your invite was already used but you lost the session before adding a passkey, ask the relay owner for a user recovery code.",
     controlPlane: "Control Plane",
     currentWorkspace: "Current Workspace",
+    context: "Context",
     connecting: "Connecting…",
     workspace: "Workspace",
     agent: "Agent",
@@ -42,6 +43,7 @@ const translations = {
     tabSessions: "Sessions",
     tabAgents: "Agents",
     tabMore: "More",
+    control: "Control",
     askEyebrow: "Ask",
     askTitle: "Run With Codex",
     agentDetails: "Agent Details",
@@ -229,6 +231,7 @@ const translations = {
     userRecoveryHint: "如果邀请码已经用过，但用户还没绑定 passkey 就丢失了会话，请向 relay owner 申请一个用户恢复码。",
     controlPlane: "控制平面",
     currentWorkspace: "当前工作区",
+    context: "上下文",
     connecting: "连接中…",
     workspace: "工作区",
     agent: "Agent",
@@ -241,6 +244,7 @@ const translations = {
     tabSessions: "会话",
     tabAgents: "Agent",
     tabMore: "更多",
+    control: "控制",
     askEyebrow: "提问",
     askTitle: "交给 Codex",
     agentDetails: "Agent 详情",
@@ -414,7 +418,8 @@ const state = {
   data: null,
   pollTimer: null,
   locale: localStorage.getItem(localeStorageKey) || "en",
-  activeTab: localStorage.getItem(activeTabStorageKey) || "ask",
+  activeTab: "ask",
+  selectedAgentId: "",
   taskType: "codex_exec",
   selectedSessionId: "",
   overlay: null,
@@ -440,8 +445,6 @@ const recoveryLoginBox = document.querySelector("#recovery-login-box");
 const inviteLoginForm = document.querySelector("#invite-login-form");
 const userRecoveryForm = document.querySelector("#user-recovery-form");
 const loginForm = document.querySelector("#login-form");
-const workspaceSelect = document.querySelector("#workspace-id");
-const agentSelect = document.querySelector("#agent-id");
 const currentUserLine = document.querySelector("#current-user-line");
 const workspaceTitle = document.querySelector("#workspace-title");
 const statusLine = document.querySelector("#status-line");
@@ -464,17 +467,9 @@ const resumeSessionBanner = document.querySelector("#resume-session-banner");
 const resumeSessionLabel = document.querySelector("#resume-session-label");
 const clearSessionSelectionButton = document.querySelector("#clear-session-selection");
 const tasksEl = document.querySelector("#tasks");
-const sessionList = document.querySelector("#session-list");
-const sessionFilterInput = document.querySelector("#session-filter");
-const pairRequestsEl = document.querySelector("#pair-requests");
-const agentListEl = document.querySelector("#agent-list");
-const agentsSummaryEl = document.querySelector("#agents-summary");
-const clearTaskCacheButton = document.querySelector("#clear-task-cache-button");
+const priorityEventsEl = document.querySelector("#priority-events");
 const askFootnote = document.querySelector("#ask-footnote");
-const agentsBadge = document.querySelector("#agents-badge");
 const moreBadge = document.querySelector("#more-badge");
-const bottomNav = document.querySelector("#bottom-nav");
-const screens = Array.from(document.querySelectorAll(".screen"));
 const backdrop = document.querySelector("#overlay-backdrop");
 const sidePanel = document.querySelector("#side-panel");
 const panelTitle = document.querySelector("#panel-title");
@@ -488,9 +483,7 @@ const sheetContent = document.querySelector("#sheet-content");
 const closeSheetButton = document.querySelector("#close-sheet-button");
 const langButtons = [
   document.querySelector("#lang-en"),
-  document.querySelector("#lang-zh"),
-  document.querySelector("#more-lang-en"),
-  document.querySelector("#more-lang-zh")
+  document.querySelector("#lang-zh")
 ];
 
 function bytesToBase64Url(value) {
@@ -695,7 +688,6 @@ function applyStaticLocale() {
     element.textContent = t(element.dataset.i18n);
   }
   taskPrompt.placeholder = t("promptPlaceholder");
-  sessionFilterInput.placeholder = t("searchSessions");
   document.querySelector("#invite-code").placeholder = "ABCD-EFGH-IJKL";
   document.querySelector("#invite-display-name").placeholder = t("displayName");
   document.querySelector("#user-recovery-code").placeholder = "ABCD-EFGH-IJKL";
@@ -753,7 +745,7 @@ function agentStatusLabel(agent) {
 }
 
 function selectedAgent() {
-  return (state.data?.agents || []).find((agent) => agent.agentId === agentSelect.value) || null;
+  return (state.data?.agents || []).find((agent) => agent.agentId === state.selectedAgentId) || null;
 }
 
 function selectedSession(agent = selectedAgent()) {
@@ -889,11 +881,10 @@ async function refresh() {
     agents,
     tasks
   };
-  const currentAgentId = agentSelect.value;
+  const currentAgentId = state.selectedAgentId;
   const availableAgent = agents.some((agent) => agent.agentId === currentAgentId) ? currentAgentId : agents[0]?.agentId || "";
+  state.selectedAgentId = availableAgent;
   renderAuthStatus(state.data.auth || state.authStatus);
-  renderWorkspaceSelect(state.data.auth);
-  renderAgentSelect(availableAgent);
   if (state.selectedSessionId && !selectedSession()) {
     state.selectedSessionId = "";
   }
@@ -1114,8 +1105,9 @@ async function revokeInvite(inviteId) {
 
 async function revokeAgent(agentId) {
   await api(`/api/admin/agents/${encodeURIComponent(agentId)}/revoke`, { method: "POST" });
-  if (agentSelect.value === agentId) {
+  if (state.selectedAgentId === agentId) {
     clearSelectedSession();
+    state.selectedAgentId = "";
   }
   await refresh();
   renderOverlay();
@@ -1147,7 +1139,7 @@ function routeState() {
 }
 
 function normalizeRoute(route) {
-  const tab = ["ask", "sessions", "agents", "more"].includes(route?.tab) ? route.tab : "ask";
+  const tab = "ask";
   const overlay = route?.overlay && typeof route.overlay === "object" ? route.overlay : null;
   return { tab, overlay };
 }
@@ -1237,40 +1229,7 @@ function renderAuthStatus(auth) {
   });
 }
 
-function renderWorkspaceSelect(auth) {
-  const workspaces = auth?.workspaces || [];
-  const previousValue = workspaceSelect.value;
-  workspaceSelect.innerHTML = "";
-  if (!workspaces.length) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = t("noWorkspace");
-    workspaceSelect.append(option);
-    workspaceSelect.disabled = true;
-    return;
-  }
-  workspaceSelect.disabled = false;
-  for (const workspace of workspaces) {
-    const option = document.createElement("option");
-    option.value = workspace.workspaceId;
-    option.textContent = `${workspace.name} (${formatRoleLabel(workspace.role)})`;
-    workspaceSelect.append(option);
-  }
-  workspaceSelect.value = auth.currentWorkspaceId || previousValue || workspaces[0].workspaceId;
-}
-
-function renderAgentSelect(preferredAgentId = "") {
-  const agents = (state.data?.agents || []).filter((agent) => !agent.revokedAt);
-  const previousValue = preferredAgentId || agentSelect.value;
-  agentSelect.innerHTML = "";
-  for (const agent of agents) {
-    const option = document.createElement("option");
-    option.value = agent.agentId;
-    option.textContent = `${agent.label || agent.agentId} (${agent.agentId})`;
-    agentSelect.append(option);
-  }
-  agentSelect.value = agents.some((agent) => agent.agentId === previousValue) ? previousValue : agents[0]?.agentId || "";
-  agentSelect.disabled = agents.length === 0;
+function syncTaskSelectors() {
   actionSelect.innerHTML = "";
   logSelect.innerHTML = "";
   for (const action of selectedAgent()?.actions || []) {
@@ -1286,6 +1245,31 @@ function renderAgentSelect(preferredAgentId = "") {
     logSelect.append(option);
   }
   syncTaskFields();
+}
+
+function workspaceOptionsHtml() {
+  const workspaces = getCurrentAuth()?.workspaces || [];
+  if (!workspaces.length) {
+    return `<option value="">${escapeHtml(t("noWorkspace"))}</option>`;
+  }
+  return workspaces
+    .map(
+      (workspace) =>
+        `<option value="${escapeHtml(workspace.workspaceId)}" ${workspace.workspaceId === getCurrentAuth()?.currentWorkspaceId ? "selected" : ""}>${escapeHtml(`${workspace.name} (${formatRoleLabel(workspace.role)})`)}</option>`
+    )
+    .join("");
+}
+
+function agentOptionsHtml() {
+  const agents = (state.data?.agents || []).filter((agent) => !agent.revokedAt);
+  return agents.length
+    ? agents
+        .map(
+          (agent) =>
+            `<option value="${escapeHtml(agent.agentId)}" ${agent.agentId === state.selectedAgentId ? "selected" : ""}>${escapeHtml(`${agent.label || agent.agentId} (${agent.agentId})`)}</option>`
+        )
+        .join("")
+    : `<option value="">${escapeHtml(t("noAgents"))}</option>`;
 }
 
 function syncTaskFields() {
@@ -1323,14 +1307,8 @@ function render() {
     agents: state.data.agents?.length || 0,
     tasks: state.data.tasks?.length || 0
   });
-  for (const screen of screens) {
-    screen.classList.toggle("active", screen.dataset.screen === state.activeTab);
-  }
-  for (const button of bottomNav.querySelectorAll("[data-tab]")) {
-    button.classList.toggle("active", button.dataset.tab === state.activeTab);
-  }
+  syncTaskSelectors();
   renderAsk();
-  renderSessions();
   renderAgents();
   renderBadges();
   renderOverlay();
@@ -1338,23 +1316,25 @@ function render() {
 }
 
 function renderBadges() {
-  const pendingCount = state.data?.pendingPairRequests?.length || 0;
-  agentsBadge.classList.toggle("hidden", pendingCount === 0);
-  agentsBadge.textContent = pendingCount > 9 ? "9+" : String(pendingCount || "");
   const needsEnrollment = !!state.data?.auth?.needsPasskeyEnrollment;
   moreBadge.classList.toggle("hidden", !needsEnrollment);
   moreBadge.textContent = needsEnrollment ? "•" : "";
 }
 
 function renderAsk() {
-  const tasks = (state.data?.tasks || []).slice(0, 3);
+  const tasks = (state.data?.tasks || []).slice(0, 6);
   const permissions = currentPermissions();
-  taskForm.classList.toggle("hidden", !permissions.createTasks || !currentWorkspace());
+  taskForm.classList.toggle("hidden", !permissions.createTasks || !currentWorkspace() || !selectedAgent());
   tasksEl.innerHTML = tasks.length ? tasks.map(taskCard).join("") : emptyState(t("noTasks"));
   syncTaskFields();
 }
 
-function renderSessions() {
+function renderAgents() {
+  const pending = state.data?.pendingPairRequests || [];
+  priorityEventsEl.innerHTML = pending.length ? pending.map(pairRequestCard).join("") : emptyState(t("noPendingDevices"));
+}
+
+function filteredSessions() {
   const agent = selectedAgent();
   const filter = state.sessionFilter.trim().toLowerCase();
   let sessions = agent?.codexSessions || [];
@@ -1364,28 +1344,98 @@ function renderSessions() {
       return haystack.includes(filter);
     });
   }
-  sessionList.innerHTML = sessions.length ? sessions.map((session) => sessionRow(session)).join("") : emptyState(t("noSessions"));
-  for (const row of sessionList.querySelectorAll(".session-card-content")) {
-    row.classList.toggle("open", row.dataset.sessionId === state.swipedSessionId);
-    row.classList.toggle("active", row.dataset.sessionId === state.selectedSessionId);
-  }
+  return sessions;
 }
 
-function renderAgents() {
-  const pending = state.data?.pendingPairRequests || [];
-  const agents = state.data?.agents || [];
-  const online = agents.filter((agent) => agentStatus(agent) === "online").length;
-  const stale = agents.filter((agent) => agentStatus(agent) === "stale").length;
-  const revoked = agents.filter((agent) => agentStatus(agent) === "revoked").length;
-  agentsSummaryEl.innerHTML = `
-    <div class="summary-pill">${escapeHtml(t("pairSummary", { agents: agents.length, pending: pending.length }))}</div>
-    <div class="summary-pill">${escapeHtml(`${t("statusOnline")} ${online}`)}</div>
-    <div class="summary-pill">${escapeHtml(`${t("statusStale")} ${stale}`)}</div>
-    ${revoked ? `<div class="summary-pill">${escapeHtml(`${t("statusRevoked")} ${revoked}`)}</div>` : ""}
-    ${state.data?.auth?.needsPasskeyEnrollment ? `<div class="summary-pill">${escapeHtml(t("passkeyEnrollRequired"))}</div>` : ""}
+function sessionsDrawerHtml() {
+  const sessions = filteredSessions();
+  return `
+    <section class="card">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${escapeHtml(t("sessionEyebrow"))}</p>
+          <h3>${escapeHtml(t("codexSessions"))}</h3>
+        </div>
+      </div>
+      <p class="hint">${escapeHtml(t("sessionsHint"))}</p>
+      <label class="search-field" style="margin-top:12px;">
+        <span class="hidden">${escapeHtml(t("searchSessions"))}</span>
+        <input id="panel-session-filter" type="search" autocomplete="off" value="${escapeHtml(state.sessionFilter)}" placeholder="${escapeHtml(t("searchSessions"))}">
+      </label>
+      <div class="session-stack" style="margin-top:14px;">${sessions.length ? sessions.map((session) => sessionRow(session)).join("") : emptyState(t("noSessions"))}</div>
+    </section>
   `;
-  pairRequestsEl.innerHTML = pending.length ? pending.map(pairRequestCard).join("") : emptyState(t("noPendingDevices"));
-  agentListEl.innerHTML = agents.length ? agents.map(agentCard).join("") : emptyState(t("noAgents"));
+}
+
+function contextPanelHtml() {
+  const agent = selectedAgent();
+  return `
+    <section class="card">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${escapeHtml(t("controlPlane"))}</p>
+          <h3>${escapeHtml(t("currentWorkspace"))}</h3>
+        </div>
+      </div>
+      <div class="context-strip">
+        <label class="select-card">
+          <span>${escapeHtml(t("workspace"))}</span>
+          <select id="context-workspace-id">${workspaceOptionsHtml()}</select>
+        </label>
+        <label class="select-card">
+          <span>${escapeHtml(t("agent"))}</span>
+          <select id="context-agent-id">${agentOptionsHtml()}</select>
+        </label>
+      </div>
+      <p class="hint" style="margin-top:12px;">${escapeHtml(t("currentUserSummary", {
+        user: getCurrentAuth()?.currentUser?.displayName || t("userDefault"),
+        role: getCurrentAuth()?.currentRole ? formatRoleLabel(getCurrentAuth()?.currentRole) : t("noRole"),
+        workspace: currentWorkspace()?.name || t("noWorkspace")
+      }))}</p>
+    </section>
+    <section class="card" style="margin-top:12px;">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${escapeHtml(t("agentsEyebrow"))}</p>
+          <h3>${escapeHtml(agent?.label || t("agent"))}</h3>
+        </div>
+        <button type="button" class="secondary" data-open-sheet="pair">${escapeHtml(t("pairNewAgent"))}</button>
+      </div>
+      ${agent ? agentCard(agent) : emptyState(t("noAgents"))}
+      <div style="margin-top:14px;">${(state.data?.pendingPairRequests || []).length ? state.data.pendingPairRequests.map(pairRequestCard).join("") : emptyState(t("noPendingDevices"))}</div>
+    </section>
+  `;
+}
+
+function controlPanelHtml() {
+  return `
+    <section class="card">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${escapeHtml(t("moreEyebrow"))}</p>
+          <h3>${escapeHtml(t("moreTitle"))}</h3>
+        </div>
+      </div>
+      <div class="locale-switch control-locale" role="group" aria-label="Language">
+        <button type="button" class="locale-button ${state.locale === "en" ? "active" : ""}" data-set-locale="en">EN</button>
+        <button type="button" class="locale-button ${state.locale === "zh" ? "active" : ""}" data-set-locale="zh">中文</button>
+      </div>
+      <div class="menu-stack" style="margin-top:14px;">
+        <button type="button" class="menu-card" data-open-panel="workspace">
+          <strong>${escapeHtml(t("workspaceTitle"))}</strong>
+          <span>${escapeHtml(t("workspaceHintShort"))}</span>
+        </button>
+        <button type="button" class="menu-card" data-open-panel="access">
+          <strong>${escapeHtml(t("accessTitle"))}</strong>
+          <span>${escapeHtml(t("accessHintShort"))}</span>
+        </button>
+        <button type="button" class="menu-card" data-clear-cache>
+          <strong>${escapeHtml(t("clearCache"))}</strong>
+          <span>${escapeHtml(t("clearCacheHint"))}</span>
+        </button>
+      </div>
+    </section>
+  `;
 }
 
 function renderOverlay() {
@@ -1421,7 +1471,19 @@ function renderPanel() {
   if (!overlay || overlay.kind !== "panel") {
     return;
   }
-  if (overlay.view === "workspace") {
+  if (overlay.view === "context") {
+    panelEyebrow.textContent = t("controlPlane");
+    panelTitle.textContent = currentWorkspace()?.name || t("currentWorkspace");
+    panelContent.innerHTML = contextPanelHtml();
+  } else if (overlay.view === "sessions") {
+    panelEyebrow.textContent = t("sessionEyebrow");
+    panelTitle.textContent = t("codexSessions");
+    panelContent.innerHTML = sessionsDrawerHtml();
+  } else if (overlay.view === "control") {
+    panelEyebrow.textContent = t("moreEyebrow");
+    panelTitle.textContent = t("moreTitle");
+    panelContent.innerHTML = controlPanelHtml();
+  } else if (overlay.view === "workspace") {
     panelEyebrow.textContent = t("workspaceSetupEyebrow");
     panelTitle.textContent = t("workspaceTitle");
     panelContent.innerHTML = workspacePanelHtml();
@@ -1435,7 +1497,7 @@ function renderPanel() {
     panelTitle.textContent = session?.title || t("codexSessionDefault");
     panelContent.innerHTML = sessionPanelHtml(session);
   } else if (overlay.view === "agent") {
-    const agent = findAgentById(overlay.agentId || agentSelect.value);
+    const agent = findAgentById(overlay.agentId || state.selectedAgentId);
     panelEyebrow.textContent = t("agentsEyebrow");
     panelTitle.textContent = agent?.label || agent?.agentId || t("agent");
     panelContent.innerHTML = agentPanelHtml(agent);
@@ -1955,7 +2017,7 @@ function findAgentById(agentId) {
 
 function latestSessionReadTask(sessionId) {
   return (state.data?.tasks || [])
-    .filter((task) => task.type === "read_session" && task.sessionId === sessionId && task.agentId === agentSelect.value)
+    .filter((task) => task.type === "read_session" && task.sessionId === sessionId && task.agentId === state.selectedAgentId)
     .sort((left, right) => Date.parse(right.updatedAt || right.createdAt || "") - Date.parse(left.updatedAt || left.createdAt || ""))[0] || null;
 }
 
@@ -2032,7 +2094,7 @@ function endSwipe(event) {
   content.style.transition = "";
   content.style.transform = "";
   gesture = null;
-  renderSessions();
+  renderOverlay();
 }
 
 async function handleDeleteSession(sessionId) {
@@ -2042,12 +2104,12 @@ async function handleDeleteSession(sessionId) {
     return;
   }
   await submitTask({
-    agentId: agentSelect.value,
+    agentId: state.selectedAgentId,
     type: "delete_session",
     title: t("delete"),
     sessionId
   });
-  removeSessionFromLocalState(agentSelect.value, sessionId);
+  removeSessionFromLocalState(state.selectedAgentId, sessionId);
   if (state.selectedSessionId === sessionId) {
     clearSelectedSession();
   }
@@ -2058,8 +2120,6 @@ async function handleDeleteSession(sessionId) {
 function bindGlobalEvents() {
   document.querySelector("#lang-en").addEventListener("click", () => setLocale("en"));
   document.querySelector("#lang-zh").addEventListener("click", () => setLocale("zh"));
-  document.querySelector("#more-lang-en").addEventListener("click", () => setLocale("en"));
-  document.querySelector("#more-lang-zh").addEventListener("click", () => setLocale("zh"));
 
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2106,22 +2166,6 @@ function bindGlobalEvents() {
     logout().catch(() => {});
   });
 
-  workspaceSelect.addEventListener("change", async () => {
-    if (!workspaceSelect.value) {
-      return;
-    }
-    try {
-      await switchWorkspace(workspaceSelect.value);
-    } catch (error) {
-      alert(String(error.message || error));
-    }
-  });
-
-  agentSelect.addEventListener("change", () => {
-    clearSelectedSession();
-    render();
-  });
-
   taskTypeButtons.forEach((button) => {
     button.addEventListener("click", () => {
       state.taskType = button.dataset.taskType;
@@ -2137,7 +2181,7 @@ function bindGlobalEvents() {
     try {
       const type = state.taskType;
       const body = {
-        agentId: agentSelect.value,
+        agentId: state.selectedAgentId,
         type,
         title: type === "codex_exec" ? t("taskTypeCodex") : type === "run_action" ? t("taskTypeAction") : t("taskTypeLog")
       };
@@ -2157,7 +2201,7 @@ function bindGlobalEvents() {
         body.title = t("logLabel", { log: logSelect.value });
       }
       await submitTask(body);
-      setActiveTab("ask");
+      render();
     } catch (error) {
       alert(String(error.message || error));
     }
@@ -2168,38 +2212,16 @@ function bindGlobalEvents() {
     render();
   });
 
-  clearTaskCacheButton.addEventListener("click", () => {
-    state.taskCache = {};
-    state.sessionCache = {};
-    clearLegacySensitiveStorage();
-    sessionStorage.removeItem(taskCacheKey);
-    sessionStorage.removeItem(sessionCacheKey);
-    render();
-  });
-
-  sessionFilterInput.addEventListener("input", () => {
-    state.sessionFilter = sessionFilterInput.value;
-    renderSessions();
-  });
-
-  bottomNav.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-tab]");
-    if (!button) {
-      return;
-    }
-    setActiveTab(button.dataset.tab);
-  });
-
   document.addEventListener("click", (event) => {
     const panelTrigger = event.target.closest("[data-open-panel]");
     if (panelTrigger) {
       const target = panelTrigger.dataset.openPanel;
-      if (target === "workspace" || target === "access") {
+      if (target === "workspace" || target === "access" || target === "context" || target === "sessions" || target === "control") {
         openPanel(target);
         return;
       }
       if (target === "agent-current") {
-        openPanel("agent", { agentId: agentSelect.value });
+        openPanel("agent", { agentId: state.selectedAgentId });
         return;
       }
     }
@@ -2225,10 +2247,9 @@ function bindGlobalEvents() {
     }
   });
 
-  pairRequestsEl.addEventListener("click", async (event) => {
+  priorityEventsEl.addEventListener("click", async (event) => {
     const approveId = event.target.getAttribute("data-approve-pair");
     const rejectId = event.target.getAttribute("data-reject-pair");
-    const agentId = event.target.getAttribute("data-open-agent");
     try {
       if (approveId) {
         await api(`/api/admin/pair-requests/${approveId}/approve`, { method: "POST" });
@@ -2236,45 +2257,10 @@ function bindGlobalEvents() {
       } else if (rejectId) {
         await api(`/api/admin/pair-requests/${rejectId}/reject`, { method: "POST" });
         await refresh();
-      } else if (agentId) {
-        openPanel("agent", { agentId });
       }
     } catch (error) {
       alert(String(error.message || error));
     }
-  });
-
-  agentListEl.addEventListener("click", (event) => {
-    const agentId = event.target.getAttribute("data-open-agent");
-    if (agentId) {
-      openPanel("agent", { agentId });
-    }
-  });
-
-  sessionList.addEventListener("pointerdown", startSwipe);
-  sessionList.addEventListener("pointermove", moveSwipe);
-  sessionList.addEventListener("pointerup", endSwipe);
-  sessionList.addEventListener("pointercancel", endSwipe);
-  sessionList.addEventListener("click", async (event) => {
-    const deleteSessionId = event.target.getAttribute("data-delete-session");
-    if (deleteSessionId) {
-      await handleDeleteSession(deleteSessionId).catch((error) => alert(String(error.message || error)));
-      return;
-    }
-    const content = event.target.closest(".session-card-content");
-    if (!content) {
-      return;
-    }
-    const sessionId = content.dataset.sessionId;
-    if (state.swipedSessionId === sessionId) {
-      state.swipedSessionId = "";
-      renderSessions();
-      return;
-    }
-    if (gesture?.moved) {
-      return;
-    }
-    openPanel("session", { sessionId });
   });
 
   panelContent.addEventListener("submit", async (event) => {
@@ -2305,11 +2291,21 @@ function bindGlobalEvents() {
     if (event.target.id === "invite-type") {
       state.inviteType = event.target.value;
       renderOverlay();
+    } else if (event.target.id === "panel-session-filter") {
+      state.sessionFilter = event.target.value;
+      renderOverlay();
+    } else if (event.target.id === "context-agent-id") {
+      state.selectedAgentId = event.target.value;
+      clearSelectedSession();
+      render();
+    } else if (event.target.id === "context-workspace-id" && event.target.value) {
+      switchWorkspace(event.target.value).catch((error) => alert(String(error.message || error)));
     }
   });
 
   panelContent.addEventListener("click", async (event) => {
     try {
+      const sessionContent = event.target.closest(".session-card-content");
       const continueSessionId = event.target.getAttribute("data-continue-session");
       const readSessionId = event.target.getAttribute("data-read-session");
       const deleteSessionId = event.target.getAttribute("data-delete-session");
@@ -2322,18 +2318,66 @@ function bindGlobalEvents() {
       const revokeSessionsUserId = event.target.getAttribute("data-revoke-user-sessions");
       const deleteUserId = event.target.getAttribute("data-delete-user");
       const membershipId = event.target.getAttribute("data-revoke-membership");
+      const approvePairId = event.target.getAttribute("data-approve-pair");
+      const rejectPairId = event.target.getAttribute("data-reject-pair");
+      const openAgentId = event.target.getAttribute("data-open-agent");
+      const setLocaleValue = event.target.getAttribute("data-set-locale");
+      const wantsClearCache = event.target.hasAttribute("data-clear-cache");
+
+      if (setLocaleValue) {
+        setLocale(setLocaleValue);
+        renderOverlay();
+        return;
+      }
+      if (sessionContent && state.overlay?.view === "sessions") {
+        const sessionId = sessionContent.dataset.sessionId;
+        if (state.swipedSessionId === sessionId) {
+          state.swipedSessionId = "";
+          renderOverlay();
+          return;
+        }
+        if (gesture?.moved) {
+          return;
+        }
+        openPanel("session", { sessionId });
+        return;
+      }
+      if (wantsClearCache) {
+        state.taskCache = {};
+        state.sessionCache = {};
+        clearLegacySensitiveStorage();
+        sessionStorage.removeItem(taskCacheKey);
+        sessionStorage.removeItem(sessionCacheKey);
+        render();
+        renderOverlay();
+        return;
+      }
+      if (approvePairId) {
+        await api(`/api/admin/pair-requests/${approvePairId}/approve`, { method: "POST" });
+        await refresh();
+        return;
+      }
+      if (rejectPairId) {
+        await api(`/api/admin/pair-requests/${rejectPairId}/reject`, { method: "POST" });
+        await refresh();
+        return;
+      }
+      if (openAgentId) {
+        openPanel("agent", { agentId: openAgentId });
+        return;
+      }
 
       if (continueSessionId) {
         state.selectedSessionId = continueSessionId;
         state.taskType = "codex_exec";
         state.overlay = null;
-        setActiveTab("ask");
+        render();
         taskPrompt.focus();
         return;
       }
       if (readSessionId) {
         await submitTask({
-          agentId: agentSelect.value,
+          agentId: state.selectedAgentId,
           type: "read_session",
           title: t("loadConversation"),
           sessionId: readSessionId
@@ -2406,6 +2450,27 @@ function bindGlobalEvents() {
       }
     } catch (error) {
       alert(String(error.message || error));
+    }
+  });
+
+  panelContent.addEventListener("pointerdown", (event) => {
+    if (state.overlay?.view === "sessions") {
+      startSwipe(event);
+    }
+  });
+  panelContent.addEventListener("pointermove", (event) => {
+    if (state.overlay?.view === "sessions") {
+      moveSwipe(event);
+    }
+  });
+  panelContent.addEventListener("pointerup", (event) => {
+    if (state.overlay?.view === "sessions") {
+      endSwipe(event);
+    }
+  });
+  panelContent.addEventListener("pointercancel", (event) => {
+    if (state.overlay?.view === "sessions") {
+      endSwipe(event);
     }
   });
 

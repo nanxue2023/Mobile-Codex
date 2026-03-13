@@ -95,7 +95,23 @@
           </div>
         </header>
 
-        <section class="screen-stack">
+        <section class="console-stack">
+          <section class="section-block console-status-block">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
+                <h3 id="workspace-title" data-i18n="currentWorkspace">Current Workspace</h3>
+              </div>
+            </div>
+            <p id="status-line" class="hint">Connecting…</p>
+            <p id="current-user-line" class="current-user-line">Signed out.</p>
+            <div class="console-actions">
+              <button type="button" class="secondary" data-open-panel="context" data-i18n="context">Context</button>
+              <button type="button" class="secondary" data-open-panel="sessions" data-i18n="tabSessions">Sessions</button>
+              <button type="button" class="secondary" data-open-panel="control"><span data-i18n="control">Control</span> <span id="more-badge" class="inline-badge hidden"></span></button>
+            </div>
+          </section>
+
           <section id="screen-ask" class="screen active" data-screen="ask">
             <article class="card composer-card">
               <div class="card-head">
@@ -103,7 +119,7 @@
                   <p class="eyebrow" data-i18n="askEyebrow">Ask</p>
                   <h3 data-i18n="askTitle">Run With Codex</h3>
                 </div>
-                <button id="open-agent-panel" type="button" class="ghost-action" data-open-panel="agent-current" data-i18n="agentDetails">Agent Details</button>
+                <button type="button" class="ghost-action" data-open-panel="agent-current" data-i18n="agentDetails">Agent Details</button>
               </div>
 
               <div id="resume-session-banner" class="session-banner hidden">
@@ -152,126 +168,29 @@
                 </div>
               </form>
             </article>
-
-            <section id="recent-tasks-section" class="section-block">
-              <div class="section-head compact">
-                <div>
-                  <p class="eyebrow" data-i18n="historyEyebrow">History</p>
-                  <h3 data-i18n="recentTasks">Recent Tasks</h3>
-                </div>
-              </div>
-              <div id="tasks"></div>
-            </section>
           </section>
 
-          <section id="screen-sessions" class="screen" data-screen="sessions">
-            <div class="section-head">
+          <section id="priority-section" class="section-block">
+            <div class="section-head compact">
               <div>
-                <p class="eyebrow" data-i18n="sessionEyebrow">Session Control</p>
-                <h3 data-i18n="codexSessions">Codex Sessions</h3>
+                <p class="eyebrow" data-i18n="approvalsEyebrow">Approvals</p>
+                <h3 data-i18n="pendingDevices">Pending Devices</h3>
               </div>
-              <p class="hint" data-i18n="sessionsHint">Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.</p>
+              <button type="button" class="secondary" data-open-sheet="pair" data-i18n="pairNewAgent">Pair New Agent</button>
             </div>
-            <label class="search-field">
-              <span class="hidden" data-i18n="searchSessions">Search sessions</span>
-              <input id="session-filter" type="search" autocomplete="off" placeholder="Search sessions">
-            </label>
-            <div id="session-list" class="session-stack"></div>
+            <div id="priority-events"></div>
           </section>
 
-          <section id="screen-agents" class="screen" data-screen="agents">
-            <div class="section-head">
+          <section id="recent-tasks-section" class="section-block">
+            <div class="section-head compact">
               <div>
-                <p class="eyebrow" data-i18n="agentsEyebrow">Agents</p>
-                <h3 data-i18n="agentsTitle">Devices And Approvals</h3>
-              </div>
-              <button id="open-pair-sheet" type="button" class="primary-action" data-open-sheet="pair" data-i18n="pairNewAgent">Pair New Agent</button>
-            </div>
-            <div id="agents-summary" class="summary-strip"></div>
-            <section class="section-block">
-              <div class="section-head compact">
-                <div>
-                  <p class="eyebrow" data-i18n="approvalsEyebrow">Approvals</p>
-                  <h3 data-i18n="pendingDevices">Pending Devices</h3>
-                </div>
-              </div>
-              <div id="pair-requests"></div>
-            </section>
-            <section class="section-block">
-              <div class="section-head compact">
-                <div>
-                  <p class="eyebrow" data-i18n="agentsEyebrow">Agents</p>
-                  <h3 data-i18n="registeredAgents">Registered Agents</h3>
-                </div>
-              </div>
-              <div id="agent-list"></div>
-            </section>
-          </section>
-
-          <section id="screen-more" class="screen" data-screen="more">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow" data-i18n="moreEyebrow">More</p>
-                <h3 data-i18n="moreTitle">Workspace And Access</h3>
+                <p class="eyebrow" data-i18n="historyEyebrow">History</p>
+                <h3 data-i18n="recentTasks">Recent Tasks</h3>
               </div>
             </div>
-            <section class="section-block">
-              <div class="section-head compact">
-                <div>
-                  <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
-                  <h3 id="workspace-title" data-i18n="currentWorkspace">Current Workspace</h3>
-                </div>
-                <div class="locale-switch inline" role="group" aria-label="Language">
-                  <button id="more-lang-en" type="button" class="locale-button active">EN</button>
-                  <button id="more-lang-zh" type="button" class="locale-button">中文</button>
-                </div>
-              </div>
-              <p id="status-line" class="hint">Connecting…</p>
-              <p id="current-user-line" class="current-user-line">Signed out.</p>
-              <div class="context-strip context-strip-more">
-                <label class="select-card">
-                  <span data-i18n="workspace">Workspace</span>
-                  <select id="workspace-id"></select>
-                </label>
-                <label class="select-card">
-                  <span data-i18n="agent">Agent</span>
-                  <select id="agent-id"></select>
-                </label>
-              </div>
-            </section>
-            <div class="menu-stack">
-              <button type="button" class="menu-card" data-open-panel="workspace">
-                <strong data-i18n="workspaceTitle">Workspace</strong>
-                <span data-i18n="workspaceHintShort">Members, invites, and workspace setup.</span>
-              </button>
-              <button type="button" class="menu-card" data-open-panel="access">
-                <strong data-i18n="accessTitle">Access</strong>
-                <span data-i18n="accessHintShort">Passkeys, users, recovery, and relay-wide controls.</span>
-              </button>
-              <button id="clear-task-cache-button" type="button" class="menu-card">
-                <strong data-i18n="clearCache">Clear Cache</strong>
-                <span data-i18n="clearCacheHint">Clear local task and session previews from this device.</span>
-              </button>
-            </div>
+            <div id="tasks"></div>
           </section>
         </section>
-
-        <nav id="bottom-nav" class="bottom-nav" aria-label="Primary">
-          <button type="button" class="tab-button active" data-tab="ask">
-            <span data-i18n="tabAsk">Ask</span>
-          </button>
-          <button type="button" class="tab-button" data-tab="sessions">
-            <span data-i18n="tabSessions">Sessions</span>
-          </button>
-          <button type="button" class="tab-button" data-tab="agents">
-            <span data-i18n="tabAgents">Agents</span>
-            <span id="agents-badge" class="tab-badge hidden"></span>
-          </button>
-          <button type="button" class="tab-button" data-tab="more">
-            <span data-i18n="tabMore">More</span>
-            <span id="more-badge" class="tab-badge hidden"></span>
-          </button>
-        </nav>
       </section>
     </main>
 

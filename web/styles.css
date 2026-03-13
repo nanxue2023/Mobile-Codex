@@ -338,7 +338,7 @@ h3 {
   display: grid;
   gap: 14px;
   min-height: calc(100vh - 180px);
-  padding-bottom: calc(92px + var(--safe-bottom));
+  padding-bottom: calc(28px + var(--safe-bottom));
 }
 
 .shell-header {
@@ -397,8 +397,39 @@ h3 {
   color: #666973;
 }
 
-.context-strip-more {
-  margin-top: 14px;
+.console-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.console-status-block {
+  display: grid;
+  gap: 12px;
+}
+
+.console-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inline-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #111111;
+  color: #ffffff;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+
+.control-locale {
+  width: fit-content;
 }
 
 .screen {
@@ -689,55 +720,6 @@ h3 {
   color: #666973;
 }
 
-.bottom-nav {
-  position: fixed;
-  left: 50%;
-  bottom: max(16px, calc(var(--safe-bottom) + 12px));
-  transform: translateX(-50%);
-  width: min(720px, calc(100vw - 20px));
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 26px;
-  background: rgba(14, 14, 16, 0.86);
-  box-shadow: var(--shadow-strong);
-  backdrop-filter: blur(18px);
-  z-index: 40;
-  transition: transform 220ms ease, opacity 220ms ease;
-}
-
-.tab-button {
-  position: relative;
-  border: 0;
-  border-radius: 18px;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.64);
-  padding: 14px 12px;
-  font-weight: 700;
-}
-
-.tab-button.active {
-  background: #ffffff;
-  color: #111111;
-}
-
-.tab-badge {
-  position: absolute;
-  top: 9px;
-  right: 14px;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: #ff3b30;
-  color: #ffffff;
-  font-size: 0.7rem;
-  line-height: 18px;
-  text-align: center;
-}
-
 .overlay-backdrop {
   position: fixed;
   inset: 0;
@@ -838,7 +820,7 @@ h3 {
 }
 
 body.keyboard-active #recent-tasks-section,
-body.keyboard-active #bottom-nav {
+body.keyboard-active #priority-section {
   opacity: 0;
   pointer-events: none;
   transform: translateY(18px);

@@ -954,6 +954,58 @@ function sanitizeTask(task) {
   };
 }
 
+function sanitizeTaskResult(taskType, result) {
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    return null;
+  }
+  if (taskType === "codex_exec") {
+    return {
+      exitCode: Number.isFinite(Number(result.exitCode)) ? Number(result.exitCode) : null,
+      signal: clampText(String(result.signal || ""), 80),
+      completedAt: clampText(String(result.completedAt || ""), 80)
+    };
+  }
+  if (taskType === "run_action") {
+    return {
+      actionId: clampText(String(result.actionId || ""), 80),
+      exitCode: Number.isFinite(Number(result.exitCode)) ? Number(result.exitCode) : null,
+      signal: clampText(String(result.signal || ""), 80),
+      completedAt: clampText(String(result.completedAt || ""), 80)
+    };
+  }
+  if (taskType === "read_log") {
+    return {
+      logSourceId: clampText(String(result.logSourceId || ""), 80),
+      lineCount: Math.max(0, Math.min(Number(result.lineCount || 0), 5000)),
+      completedAt: clampText(String(result.completedAt || ""), 80)
+    };
+  }
+  if (taskType === "delete_session") {
+    return {
+      sessionId: clampText(String(result.sessionId || ""), 120),
+      deleted: !!result.deleted,
+      completedAt: clampText(String(result.completedAt || ""), 80)
+    };
+  }
+  if (taskType === "read_session") {
+    const messages = Array.isArray(result.messages)
+      ? result.messages.slice(0, 80).map((item) => ({
+          role: clampText(String(item?.role || ""), 24),
+          text: clampText(String(item?.text || ""), 400)
+        }))
+      : [];
+    return {
+      sessionId: clampText(String(result.sessionId || ""), 120),
+      title: clampText(String(result.title || ""), 200),
+      cwd: clampText(String(result.cwd || ""), 240),
+      messageCount: Math.max(0, Math.min(Number(result.messageCount || messages.length), 80)),
+      messages,
+      completedAt: clampText(String(result.completedAt || ""), 80)
+    };
+  }
+  return null;
+}
+
 function currentWorkspaceMembers(workspaceId) {
   return activeMemberships()
     .filter((membership) => membership.workspaceId === workspaceId)
@@ -1244,7 +1296,7 @@ function handleTaskUpdate(task, body, agentContext, res) {
     volatile.diffText = clampText(body.diffText, 20000);
   }
   if (body.result && typeof body.result === "object") {
-    volatile.result = body.result;
+    volatile.result = sanitizeTaskResult(task.type, body.result);
   }
   if (typeof body.error === "string") {
     volatile.error = clampText(body.error, 4000);

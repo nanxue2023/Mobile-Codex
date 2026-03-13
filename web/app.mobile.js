@@ -1,8 +1,9 @@
-const taskCacheKey = "mobileCodexTaskCache.v2";
-const sessionCacheKey = "mobileCodexSessionCache.v2";
+const taskCacheKey = "mobileCodexTaskCache.v3";
+const sessionCacheKey = "mobileCodexSessionCache.v3";
 const localeStorageKey = "mobileCodexLocale";
 const activeTabStorageKey = "mobileCodexActiveTab";
-const cachedTaskFields = ["prompt", "summary", "outputTail", "diffText", "error", "result"];
+const cachedTaskFields = ["summary", "error"];
+const legacySensitiveStorageKeys = ["mobileCodexTaskCache.v2", "mobileCodexSessionCache.v2", "mobileCodexTaskCache.v3", "mobileCodexSessionCache.v3"];
 
 const translations = {
   en: {
@@ -405,6 +406,8 @@ const translations = {
   }
 };
 
+clearLegacySensitiveStorage();
+
 const state = {
   authenticated: false,
   authStatus: null,
@@ -566,15 +569,25 @@ function serializeCredential(credential) {
 
 function loadTaskCache() {
   try {
-    return JSON.parse(localStorage.getItem(taskCacheKey) || "{}");
+    return JSON.parse(sessionStorage.getItem(taskCacheKey) || "{}");
   } catch {
     return {};
   }
 }
 
+function clearLegacySensitiveStorage() {
+  for (const key of legacySensitiveStorageKeys) {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore storage cleanup failures on locked-down browsers.
+    }
+  }
+}
+
 function loadSessionCache() {
   try {
-    return JSON.parse(localStorage.getItem(sessionCacheKey) || "{}");
+    return JSON.parse(sessionStorage.getItem(sessionCacheKey) || "{}");
   } catch {
     return {};
   }
@@ -585,7 +598,7 @@ function persistTaskCache() {
     .sort((left, right) => String(right[1]?.cachedAt || "").localeCompare(String(left[1]?.cachedAt || "")))
     .slice(0, 100);
   state.taskCache = Object.fromEntries(entries);
-  localStorage.setItem(taskCacheKey, JSON.stringify(state.taskCache));
+  sessionStorage.setItem(taskCacheKey, JSON.stringify(state.taskCache));
 }
 
 function persistSessionCache() {
@@ -593,7 +606,7 @@ function persistSessionCache() {
     .sort((left, right) => String(right[1]?.cachedAt || "").localeCompare(String(left[1]?.cachedAt || "")))
     .slice(0, 30);
   state.sessionCache = Object.fromEntries(entries);
-  localStorage.setItem(sessionCacheKey, JSON.stringify(state.sessionCache));
+  sessionStorage.setItem(sessionCacheKey, JSON.stringify(state.sessionCache));
 }
 
 function t(key, vars = {}) {
@@ -815,7 +828,13 @@ function updateSessionCache(agents) {
     if (Array.isArray(agent.codexSessions) && agent.codexSessions.length > 0) {
       state.sessionCache[agent.agentId] = {
         cachedAt: new Date().toISOString(),
-        sessions: agent.codexSessions.slice(0, 30)
+        sessions: agent.codexSessions.slice(0, 30).map((session) => ({
+          sessionId: session.sessionId,
+          title: session.title,
+          cwd: session.cwd,
+          updatedAt: session.updatedAt,
+          preview: []
+        }))
       };
     }
   }
@@ -2150,8 +2169,9 @@ function bindGlobalEvents() {
   clearTaskCacheButton.addEventListener("click", () => {
     state.taskCache = {};
     state.sessionCache = {};
-    localStorage.removeItem(taskCacheKey);
-    localStorage.removeItem(sessionCacheKey);
+    clearLegacySensitiveStorage();
+    sessionStorage.removeItem(taskCacheKey);
+    sessionStorage.removeItem(sessionCacheKey);
     render();
   });
 

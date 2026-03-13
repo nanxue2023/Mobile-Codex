@@ -18,6 +18,33 @@ const agentRuntimeState = {
     sessions: []
   }
 };
+const childEnvExactAllowlist = new Set([
+  "HOME",
+  "PATH",
+  "USER",
+  "LOGNAME",
+  "SHELL",
+  "TMPDIR",
+  "TMP",
+  "TEMP",
+  "LANG",
+  "LC_ALL",
+  "TERM",
+  "COLORTERM",
+  "NO_COLOR",
+  "CI",
+  "SSH_AUTH_SOCK",
+  "SSH_AGENT_PID",
+  "GIT_ASKPASS",
+  "GIT_SSH_COMMAND",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy"
+]);
+const childEnvPrefixAllowlist = ["OPENAI_", "CODEX_", "GIT_", "SSH_", "XDG_"];
 
 async function apiRequest(baseUrl, pathname, options = {}) {
   const response = await fetch(new URL(pathname, baseUrl), {
@@ -78,6 +105,19 @@ function writeAgentTokenFile(token) {
 
 function currentAgentToken() {
   return String(agentRuntimeState.agentToken || "").trim();
+}
+
+function buildChildEnv() {
+  const env = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value == null) {
+      continue;
+    }
+    if (childEnvExactAllowlist.has(key) || childEnvPrefixAllowlist.some((prefix) => key.startsWith(prefix))) {
+      env[key] = value;
+    }
+  }
+  return env;
 }
 
 function loadAgentToken() {
@@ -498,7 +538,7 @@ function spawnCommand(argv, cwd, timeoutSec, onOutput) {
   return new Promise((resolve, reject) => {
     const child = spawn(argv[0], argv.slice(1), {
       cwd,
-      env: process.env,
+      env: buildChildEnv(),
       stdio: ["ignore", "pipe", "pipe"]
     });
 
@@ -536,6 +576,32 @@ function spawnCommand(argv, cwd, timeoutSec, onOutput) {
       });
     });
   });
+}
+
+function readFileTail(filePath, maxLines, maxBytes = 256 * 1024) {
+  const lineLimit = Math.max(1, Math.min(Number(maxLines || 200), 2000));
+  const byteLimit = Math.max(16 * 1024, Math.min(Number(maxBytes || 256 * 1024), 1024 * 1024));
+  const stats = fs.statSync(filePath);
+  const fd = fs.openSync(filePath, "r");
+  try {
+    let position = stats.size;
+    let remaining = byteLimit;
+    let content = "";
+    let newlineCount = 0;
+    while (position > 0 && remaining > 0 && newlineCount <= lineLimit) {
+      const chunkSize = Math.min(64 * 1024, position, remaining);
+      position -= chunkSize;
+      remaining -= chunkSize;
+      const buffer = Buffer.alloc(chunkSize);
+      fs.readSync(fd, buffer, 0, chunkSize, position);
+      const text = buffer.toString("utf8");
+      content = text + content;
+      newlineCount += (text.match(/\n/g) || []).length;
+    }
+    return content.split(/\r?\n/).slice(-lineLimit).join("\n");
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 async function captureGitDiff(cwd) {
@@ -675,8 +741,7 @@ async function runReadLog(task) {
     throw new Error(`unknown-log-source:${task.logSourceId}`);
   }
   const lines = Number(source.maxLines || 200);
-  const content = fs.readFileSync(source.path, "utf8");
-  const tail = content.split(/\r?\n/).slice(-lines).join("\n");
+  const tail = readFileTail(source.path, lines);
   return {
     status: "completed",
     summary: clampText(tail, 2000),
@@ -831,9 +896,6 @@ async function runReadSession(task) {
   }
   const session = await lookupSessionForRead(task.sessionId);
   const messages = await readSessionConversation(session.rolloutPath);
-  const transcript = messages
-    .map((item) => `[${item.role}] ${item.text}`)
-    .join("\n\n");
   return {
     status: "completed",
     summary: clampText(session.title || task.sessionId || "session conversation", 2000),
@@ -845,7 +907,6 @@ async function runReadSession(task) {
       messages,
       completedAt: nowIso()
     },
-    outputAppend: clampText(transcript, config.maxTaskLogBytes || 12000),
     error: ""
   };
 }

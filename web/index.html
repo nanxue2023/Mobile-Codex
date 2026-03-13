@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
     <meta name="theme-color" content="#111111">
     <title>Mobile Codex</title>
     <link rel="manifest" href="/manifest.webmanifest">
@@ -10,326 +10,290 @@
   </head>
   <body>
     <main class="app-shell">
-      <section class="hero">
+      <header class="hero">
         <div class="hero-copy">
-          <p class="eyebrow">Mobile Remote Control</p>
-          <h1>Mobile Codex</h1>
-          <p class="subhead">A stripped-back control surface for sessions, tasks, pairing, and security.</p>
+          <p class="eyebrow" data-i18n="heroEyebrow">Mobile Remote Control</p>
+          <h1 data-i18n="appTitle">Mobile Codex</h1>
+          <p class="subhead" data-i18n="heroSubhead">A stripped-back control surface for sessions, tasks, pairing, and security.</p>
         </div>
         <div class="hero-tools">
           <div class="locale-switch" role="group" aria-label="Language">
             <button id="lang-en" type="button" class="locale-button active">EN</button>
             <button id="lang-zh" type="button" class="locale-button">中文</button>
           </div>
-          <div class="hero-mark">
+          <div class="hero-mark" aria-hidden="true">
             <span></span>
             <span></span>
           </div>
         </div>
-      </section>
+      </header>
 
       <section id="login-panel" class="auth-screen">
         <article class="auth-card">
-          <p class="eyebrow">Sign In</p>
-          <h2>Use the relay without exposing the workstation</h2>
-          <p class="hint">Passkeys are the default. Recovery token access stays available for first-time setup and break-glass recovery.</p>
+          <p class="eyebrow" data-i18n="signInEyebrow">Sign In</p>
+          <h2 data-i18n="signInTitle">Use the relay without exposing the workstation</h2>
+          <p class="hint" data-i18n="signInHint">Passkeys are the default. Recovery token access stays available for first-time setup and break-glass recovery.</p>
+
           <div id="passkey-login-box" class="auth-box">
-            <button id="passkey-login-button" type="button">Continue With Passkey</button>
-            <p id="passkey-login-hint" class="hint">Use the passkey already registered for this relay.</p>
+            <button id="passkey-login-button" type="button" class="primary-action" data-i18n="passkeyLogin">Continue With Passkey</button>
+            <p id="passkey-login-hint" class="hint" data-i18n="passkeyLoginDefaultHint">Use the passkey already registered for this relay.</p>
           </div>
+
           <details id="recovery-login-box" class="auth-box">
-            <summary>Use Recovery Token Instead</summary>
-            <form id="login-form">
+            <summary data-i18n="recoverySummary">Use Recovery Token Instead</summary>
+            <form id="login-form" class="stack-form">
               <label>
-                <span>Bootstrap Token</span>
+                <span data-i18n="bootstrapToken">Bootstrap Token</span>
                 <input id="bootstrap-token" type="password" autocomplete="off">
               </label>
-              <button type="submit">Unlock With Recovery Token</button>
+              <button type="submit" data-i18n="unlockRecovery">Unlock With Recovery Token</button>
             </form>
-            <p class="hint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
+            <p class="hint" data-i18n="recoveryHint">Use the recovery token only for first-time setup, adding a new passkey, or break-glass recovery.</p>
           </details>
+
           <details id="invite-login-box" class="auth-box">
-            <summary>Use An Invite</summary>
-            <form id="invite-login-form">
+            <summary data-i18n="inviteSummary">Use An Invite</summary>
+            <form id="invite-login-form" class="stack-form">
               <label>
-                <span>Invite Code</span>
+                <span data-i18n="inviteCode">Invite Code</span>
                 <input id="invite-code" type="text" autocomplete="off" placeholder="ABCD-EFGH-IJKL">
               </label>
               <label>
-                <span>Display Name</span>
+                <span data-i18n="displayName">Display Name</span>
                 <input id="invite-display-name" type="text" maxlength="80" placeholder="Your name">
               </label>
-              <button type="submit">Join With Invite</button>
+              <button type="submit" data-i18n="joinWithInvite">Join With Invite</button>
             </form>
-            <p class="hint">An account invite creates your own user without joining someone else's workspace. A workspace invite lets you collaborate inside the current workspace.</p>
+            <p id="invite-login-hint" class="hint" data-i18n="inviteLoginHint">An account invite creates your own user without joining someone else's workspace. A workspace invite lets you collaborate inside the current workspace.</p>
           </details>
+
           <details id="user-recovery-box" class="auth-box">
-            <summary>Use A User Recovery Code</summary>
-            <form id="user-recovery-form">
+            <summary data-i18n="userRecoverySummary">Use A User Recovery Code</summary>
+            <form id="user-recovery-form" class="stack-form">
               <label>
-                <span>Recovery Code</span>
+                <span data-i18n="userRecoveryCode">Recovery Code</span>
                 <input id="user-recovery-code" type="text" autocomplete="off" placeholder="ABCD-EFGH-IJKL">
               </label>
-              <button type="submit">Continue With Recovery Code</button>
+              <button type="submit" data-i18n="continueWithRecoveryCode">Continue With Recovery Code</button>
             </form>
-            <p class="hint">If your invite was already used but you lost the session before adding a passkey, ask the relay owner for a user recovery code.</p>
+            <p class="hint" data-i18n="userRecoveryHint">If your invite was already used but you lost the session before adding a passkey, ask the relay owner for a user recovery code.</p>
           </details>
         </article>
       </section>
 
-      <section id="dashboard" class="workspace-shell hidden">
-        <header class="topbar">
-          <section class="masthead-card">
-            <div>
-              <p class="eyebrow">Control Plane</p>
-              <h2>Current Workspace</h2>
-            </div>
+      <section id="dashboard" class="mobile-shell hidden">
+        <header class="shell-header">
+          <div class="shell-copy">
+            <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
+            <h2 id="workspace-title">Current Workspace</h2>
             <p id="status-line" class="hint">Connecting…</p>
-          </section>
-          <section class="utility-card">
-            <label class="compact-field">
-              <span>Workspace</span>
-              <select id="workspace-id"></select>
-            </label>
-            <label class="compact-field">
-              <span>Agent</span>
-              <select id="agent-id" required></select>
-            </label>
-            <p id="current-user-line" class="hint">Signed out.</p>
-            <div class="toolbar-actions">
-              <button id="refresh-button" type="button" class="secondary">Refresh</button>
-              <button id="clear-task-cache-button" type="button" class="secondary">Clear Cache</button>
-              <button id="logout-button" type="button" class="secondary">Logout</button>
+          </div>
+          <div class="shell-tools">
+            <div class="locale-switch inline" role="group" aria-label="Language">
+              <button id="dash-lang-en" type="button" class="locale-button active">EN</button>
+              <button id="dash-lang-zh" type="button" class="locale-button">中文</button>
             </div>
-          </section>
+            <div class="header-actions">
+              <button id="refresh-button" type="button" class="secondary" data-i18n="refresh">Refresh</button>
+              <button id="logout-button" type="button" class="secondary" data-i18n="logout">Logout</button>
+            </div>
+          </div>
         </header>
 
-        <nav id="view-nav" class="view-tabs" aria-label="Sections">
-          <button type="button" class="view-tab active" data-view-target="workspace">Workspace</button>
-          <button type="button" class="view-tab" data-view-target="sessions">Sessions</button>
-          <button type="button" class="view-tab" data-view-target="agents">Agents</button>
-          <button type="button" class="view-tab" data-view-target="security">Security</button>
-        </nav>
+        <section class="context-strip">
+          <label class="select-card">
+            <span data-i18n="workspace">Workspace</span>
+            <select id="workspace-id"></select>
+          </label>
+          <label class="select-card">
+            <span data-i18n="agent">Agent</span>
+            <select id="agent-id"></select>
+          </label>
+        </section>
 
-        <section class="view-stage">
-          <section class="view-panel active" data-view-panel="workspace">
-            <div class="view-stack">
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Compose</p>
-                    <h3>New Task</h3>
-                  </div>
-                </div>
-                <div id="resume-session-banner" class="session-banner hidden">
-                  <div>
-                    <strong>Continuing Session</strong>
-                    <p id="resume-session-label" class="hint"></p>
-                  </div>
-                  <button id="clear-session-selection" type="button" class="secondary">Use New Session</button>
-                </div>
-                <form id="task-form">
-                  <label>
-                    <span>Type</span>
-                    <select id="task-type">
-                      <option value="codex_exec">Codex Task</option>
-                      <option value="run_action">Run Action</option>
-                      <option value="read_log">Read Log</option>
-                    </select>
-                  </label>
-                  <label id="codex-prompt-row">
-                    <span>Prompt</span>
-                    <textarea id="task-prompt" rows="6" placeholder="Describe the coding task you want Codex to perform."></textarea>
-                  </label>
-                  <label id="cwd-row">
-                    <span>Relative CWD</span>
-                    <input id="task-cwd" type="text" value=".">
-                  </label>
-                  <label id="write-row" class="switch-row">
-                    <span>Allow Workspace Writes</span>
-                    <input id="task-write" type="checkbox">
-                  </label>
-                  <label id="action-row" class="hidden">
-                    <span>Action</span>
-                    <select id="task-action-id"></select>
-                  </label>
-                  <label id="log-row" class="hidden">
-                    <span>Log Source</span>
-                    <select id="task-log-source-id"></select>
-                  </label>
-                  <button type="submit">Submit Task</button>
-                </form>
-              </article>
+        <p id="current-user-line" class="current-user-line">Signed out.</p>
 
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">History</p>
-                    <h3>Recent Tasks</h3>
-                  </div>
+        <section class="screen-stack">
+          <section id="screen-ask" class="screen active" data-screen="ask">
+            <article class="card composer-card">
+              <div class="card-head">
+                <div>
+                  <p class="eyebrow" data-i18n="askEyebrow">Ask</p>
+                  <h3 data-i18n="askTitle">Run With Codex</h3>
                 </div>
-                <div id="tasks"></div>
-              </article>
-            </div>
+                <button id="open-agent-panel" type="button" class="ghost-action" data-open-panel="agent-current" data-i18n="agentDetails">Agent Details</button>
+              </div>
+
+              <div id="resume-session-banner" class="session-banner hidden">
+                <div>
+                  <strong data-i18n="continuingSession">Continuing Session</strong>
+                  <p id="resume-session-label" class="hint"></p>
+                </div>
+                <button id="clear-session-selection" type="button" class="secondary" data-i18n="useNewSession">Use New Session</button>
+              </div>
+
+              <form id="task-form" class="stack-form">
+                <div class="mode-switch" role="tablist" aria-label="Task Type">
+                  <button type="button" class="mode-button active" data-task-type="codex_exec" data-i18n="tabAsk">Ask</button>
+                  <button type="button" class="mode-button" data-task-type="run_action" data-i18n="taskTypeAction">Run Action</button>
+                  <button type="button" class="mode-button" data-task-type="read_log" data-i18n="taskTypeLog">Read Log</button>
+                </div>
+
+                <label id="codex-prompt-row">
+                  <span id="task-prompt-label" data-i18n="prompt">Prompt</span>
+                  <textarea id="task-prompt" rows="6" placeholder="Describe the coding task you want Codex to perform."></textarea>
+                </label>
+
+                <label id="cwd-row">
+                  <span data-i18n="relativeCwd">Relative CWD</span>
+                  <input id="task-cwd" type="text" value=".">
+                </label>
+
+                <label id="write-row" class="switch-row">
+                  <span data-i18n="allowWrites">Allow Workspace Writes</span>
+                  <input id="task-write" type="checkbox">
+                </label>
+
+                <label id="action-row" class="hidden">
+                  <span data-i18n="action">Action</span>
+                  <select id="task-action-id"></select>
+                </label>
+
+                <label id="log-row" class="hidden">
+                  <span data-i18n="logSource">Log Source</span>
+                  <select id="task-log-source-id"></select>
+                </label>
+
+                <div class="composer-footer">
+                  <p id="ask-footnote" class="hint"></p>
+                  <button id="task-submit-button" type="submit" class="primary-action" data-i18n="runTask">Run</button>
+                </div>
+              </form>
+            </article>
+
+            <section id="recent-tasks-section" class="section-block">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow" data-i18n="historyEyebrow">History</p>
+                  <h3 data-i18n="recentTasks">Recent Tasks</h3>
+                </div>
+              </div>
+              <div id="tasks"></div>
+            </section>
           </section>
 
-          <section class="view-panel" data-view-panel="sessions">
-            <div class="view-stack">
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Session Control</p>
-                    <h3>Codex Sessions</h3>
-                  </div>
-                  <p class="hint">Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.</p>
-                </div>
-                <div id="session-list"></div>
-              </article>
+          <section id="screen-sessions" class="screen" data-screen="sessions">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" data-i18n="sessionEyebrow">Session Control</p>
+                <h3 data-i18n="codexSessions">Codex Sessions</h3>
+              </div>
+              <p class="hint" data-i18n="sessionsHint">Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.</p>
             </div>
+            <label class="search-field">
+              <span class="hidden" data-i18n="searchSessions">Search sessions</span>
+              <input id="session-filter" type="search" autocomplete="off" placeholder="Search sessions">
+            </label>
+            <div id="session-list" class="session-stack"></div>
           </section>
 
-          <section class="view-panel" data-view-panel="agents">
-            <div class="view-stack">
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Provisioning</p>
-                    <h3>Pair Agent</h3>
-                  </div>
-                </div>
-                <form id="pair-form">
-                  <label>
-                    <span>Note</span>
-                    <input id="pair-note" type="text" maxlength="120" placeholder="Server or environment name">
-                  </label>
-                  <label>
-                    <span>TTL Seconds</span>
-                    <input id="pair-ttl" type="number" min="60" max="1800" value="300">
-                  </label>
-                  <button type="submit">Create Short Pair Code</button>
-                </form>
-                <pre id="pair-result" class="result-box"></pre>
-                <div id="pair-command-box" class="hidden">
-                  <label>
-                    <span>Suggested Pair Command</span>
-                    <textarea id="pair-command" rows="3" readonly></textarea>
-                  </label>
-                  <button id="copy-pair-command" type="button" class="secondary">Copy Pair Command</button>
-                </div>
-              </article>
-
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Approvals</p>
-                    <h3>Pending Devices</h3>
-                  </div>
-                </div>
-                <div id="pair-requests"></div>
-              </article>
+          <section id="screen-agents" class="screen" data-screen="agents">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" data-i18n="agentsEyebrow">Agents</p>
+                <h3 data-i18n="agentsTitle">Devices And Approvals</h3>
+              </div>
+              <button id="open-pair-sheet" type="button" class="primary-action" data-open-sheet="pair" data-i18n="pairNewAgent">Pair New Agent</button>
             </div>
+            <div id="agents-summary" class="summary-strip"></div>
+            <section class="section-block">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow" data-i18n="approvalsEyebrow">Approvals</p>
+                  <h3 data-i18n="pendingDevices">Pending Devices</h3>
+                </div>
+              </div>
+              <div id="pair-requests"></div>
+            </section>
+            <section class="section-block">
+              <div class="section-head compact">
+                <div>
+                  <p class="eyebrow" data-i18n="agentsEyebrow">Agents</p>
+                  <h3 data-i18n="registeredAgents">Registered Agents</h3>
+                </div>
+              </div>
+              <div id="agent-list"></div>
+            </section>
           </section>
 
-          <section class="view-panel" data-view-panel="security">
-            <div class="view-stack">
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Access</p>
-                    <h3>Security</h3>
-                  </div>
-                  <p id="auth-status-line" class="hint">Checking passkey status…</p>
-                </div>
-                <form id="passkey-form">
-                  <label>
-                    <span>New Passkey Label</span>
-                    <input id="passkey-label" type="text" maxlength="80" placeholder="My iPhone">
-                  </label>
-                  <button id="passkey-register-button" type="submit">Add This Device As A Passkey</button>
-                </form>
-                <div id="passkey-list"></div>
-              </article>
-
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Workspace Setup</p>
-                    <h3>Spaces</h3>
-                  </div>
-                </div>
-                <form id="workspace-form">
-                  <label>
-                    <span>Create Workspace</span>
-                    <input id="workspace-name" type="text" maxlength="80" placeholder="Production Team">
-                  </label>
-                  <button id="workspace-create-button" type="submit">Create Workspace</button>
-                </form>
-                <form id="join-workspace-form">
-                  <label>
-                    <span>Join Workspace With Invite</span>
-                    <input id="join-invite-code" type="text" maxlength="32" placeholder="ABCD-EFGH-IJKL">
-                  </label>
-                  <button id="join-workspace-button" type="submit" class="secondary">Join Existing Workspace</button>
-                </form>
-                <p id="join-workspace-hint" class="hint">Use this after you already have an account and want to collaborate inside another workspace.</p>
-              </article>
-
-              <article class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Members</p>
-                    <h3>People And Invites</h3>
-                  </div>
-                </div>
-                <form id="invite-form">
-                  <label>
-                    <span>Invite Type</span>
-                    <select id="invite-type">
-                      <option value="account">Account Invite</option>
-                      <option value="workspace">Workspace Invite</option>
-                    </select>
-                  </label>
-                  <p id="invite-type-summary" class="hint">Account invites create a standalone user. Workspace invites add someone to the current workspace.</p>
-                  <label>
-                    <span>Role</span>
-                    <select id="invite-role">
-                      <option value="viewer">Viewer</option>
-                      <option value="operator">Operator</option>
-                      <option value="owner">Owner</option>
-                    </select>
-                  </label>
-                  <label>
-                    <span>Note</span>
-                    <input id="invite-note" type="text" maxlength="120" placeholder="Who this invite is for">
-                  </label>
-                  <label>
-                    <span>TTL Seconds</span>
-                    <input id="invite-ttl" type="number" min="300" max="604800" value="86400">
-                  </label>
-                  <button id="invite-create-button" type="submit">Create Invite</button>
-                </form>
-                <pre id="invite-result" class="result-box"></pre>
-                <div id="member-list"></div>
-                <div id="invite-list"></div>
-              </article>
-
-              <article id="relay-users-panel" class="panel section-panel">
-                <div class="section-head">
-                  <div>
-                    <p class="eyebrow">Relay Users</p>
-                    <h3>Users</h3>
-                  </div>
-                  <p id="relay-users-hint" class="hint">Only relay owners can manage global users, recovery codes, and membership cleanup.</p>
-                </div>
-                <pre id="user-admin-result" class="result-box"></pre>
-                <div id="user-list"></div>
-              </article>
+          <section id="screen-more" class="screen" data-screen="more">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow" data-i18n="moreEyebrow">More</p>
+                <h3 data-i18n="moreTitle">Workspace And Access</h3>
+              </div>
+            </div>
+            <div class="menu-stack">
+              <button type="button" class="menu-card" data-open-panel="workspace">
+                <strong data-i18n="workspaceTitle">Workspace</strong>
+                <span data-i18n="workspaceHintShort">Members, invites, and workspace setup.</span>
+              </button>
+              <button type="button" class="menu-card" data-open-panel="access">
+                <strong data-i18n="accessTitle">Access</strong>
+                <span data-i18n="accessHintShort">Passkeys, users, recovery, and relay-wide controls.</span>
+              </button>
+              <button id="clear-task-cache-button" type="button" class="menu-card">
+                <strong data-i18n="clearCache">Clear Cache</strong>
+                <span data-i18n="clearCacheHint">Clear local task and session previews from this device.</span>
+              </button>
             </div>
           </section>
         </section>
+
+        <nav id="bottom-nav" class="bottom-nav" aria-label="Primary">
+          <button type="button" class="tab-button active" data-tab="ask">
+            <span data-i18n="tabAsk">Ask</span>
+          </button>
+          <button type="button" class="tab-button" data-tab="sessions">
+            <span data-i18n="tabSessions">Sessions</span>
+          </button>
+          <button type="button" class="tab-button" data-tab="agents">
+            <span data-i18n="tabAgents">Agents</span>
+            <span id="agents-badge" class="tab-badge hidden"></span>
+          </button>
+          <button type="button" class="tab-button" data-tab="more">
+            <span data-i18n="tabMore">More</span>
+            <span id="more-badge" class="tab-badge hidden"></span>
+          </button>
+        </nav>
       </section>
     </main>
 
-    <script type="module" src="/app.multi.js"></script>
+    <div id="overlay-backdrop" class="overlay-backdrop hidden"></div>
+
+    <aside id="side-panel" class="side-panel hidden" aria-hidden="true">
+      <header class="overlay-header">
+        <div>
+          <p id="panel-eyebrow" class="eyebrow"></p>
+          <h3 id="panel-title"></h3>
+        </div>
+        <button id="close-panel-button" type="button" class="secondary" data-i18n="close">Close</button>
+      </header>
+      <div id="panel-content" class="overlay-body"></div>
+    </aside>
+
+    <section id="bottom-sheet" class="bottom-sheet hidden" aria-hidden="true">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <header class="overlay-header">
+        <div>
+          <p id="sheet-eyebrow" class="eyebrow"></p>
+          <h3 id="sheet-title"></h3>
+        </div>
+        <button id="close-sheet-button" type="button" class="secondary" data-i18n="close">Close</button>
+      </header>
+      <div id="sheet-content" class="overlay-body"></div>
+    </section>
+
+    <script type="module" src="/app.mobile.js"></script>
   </body>
 </html>

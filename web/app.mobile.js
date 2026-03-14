@@ -1458,34 +1458,165 @@ function filteredSessions() {
   return sessions;
 }
 
+function unifiedHistoryItems() {
+  const filter = state.sessionFilter.trim().toLowerCase();
+  const sessionItems = filteredSessions().map((session) => ({
+    kind: "session",
+    id: session.sessionId,
+    title: session.title || t("codexSessionDefault"),
+    subtitle: session.cwd || ".",
+    summary: session.firstUserMessage || "",
+    updatedAt: session.updatedAt || "",
+    session
+  }));
+  const taskItems = (state.data?.tasks || []).map((task) => ({
+    kind: "task",
+    id: task.taskId,
+    title: task.title || task.type,
+    subtitle: `${task.agentId} · ${task.status}`,
+    summary: task.summary || task.prompt || task.error || "",
+    updatedAt: task.updatedAt || task.createdAt || "",
+    task
+  }));
+  const items = [...sessionItems, ...taskItems]
+    .filter((item) => {
+      if (!filter) {
+        return true;
+      }
+      return [item.title, item.subtitle, item.summary, item.id].join(" ").toLowerCase().includes(filter);
+    })
+    .sort((left, right) => Date.parse(right.updatedAt || 0) - Date.parse(left.updatedAt || 0));
+  return items;
+}
+
+function historyBucketKey(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return "older";
+  }
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((today - target) / 86400000);
+  if (diffDays <= 0) {
+    return "today";
+  }
+  if (diffDays === 1) {
+    return "yesterday";
+  }
+  if (diffDays <= 7) {
+    return "last7";
+  }
+  return "older";
+}
+
+function historyBucketLabel(key) {
+  const labels = {
+    en: {
+      today: "Today",
+      yesterday: "Yesterday",
+      last7: "Last 7 Days",
+      older: "Older"
+    },
+    zh: {
+      today: "今天",
+      yesterday: "昨天",
+      last7: "最近 7 天",
+      older: "更早"
+    }
+  };
+  return labels[state.locale]?.[key] || labels.en[key] || key;
+}
+
+function groupedHistoryItems(items) {
+  const groups = [
+    { key: "today", label: historyBucketLabel("today"), items: [] },
+    { key: "yesterday", label: historyBucketLabel("yesterday"), items: [] },
+    { key: "last7", label: historyBucketLabel("last7"), items: [] },
+    { key: "older", label: historyBucketLabel("older"), items: [] }
+  ];
+  const groupMap = new Map(groups.map((group) => [group.key, group]));
+  items.forEach((item) => {
+    groupMap.get(historyBucketKey(item.updatedAt))?.items.push(item);
+  });
+  return groups.filter((group) => group.items.length);
+}
+
 function sessionsDrawerHtml() {
   const sessions = filteredSessions();
-  const tasks = (state.data?.tasks || []).slice(0, 12);
+  const items = unifiedHistoryItems();
+  const groups = groupedHistoryItems(items);
   return `
-    <section class="section-block">
-      <div class="section-head compact">
+    <section class="history-shell">
+      <header class="history-shell-head">
         <div>
           <p class="eyebrow">${escapeHtml(t("historyEyebrow"))}</p>
-          <h3>${escapeHtml(t("recentTasks"))}</h3>
-        </div>
-      </div>
-      <div>${tasks.length ? tasks.map(taskCard).join("") : emptyState(t("noTasks"))}</div>
-    </section>
-    <section class="section-block">
-      <div class="section-head compact">
-        <div>
-          <p class="eyebrow">${escapeHtml(t("sessionEyebrow"))}</p>
           <h3>${escapeHtml(t("codexSessions"))}</h3>
         </div>
-        ${sessions.length ? `<button type="button" class="danger-action" style="padding: 6px 12px; font-size: 0.8rem;" data-delete-all-sessions>${escapeHtml(t("deleteAll"))}</button>` : ""}
-      </div>
+        ${sessions.length ? `<button type="button" class="ghost-action history-clear" data-delete-all-sessions>${escapeHtml(t("deleteAll"))}</button>` : ""}
+      </header>
       <p class="hint">${escapeHtml(t("sessionsHint"))}</p>
-      <label class="search-field" style="margin-top:12px;">
+      <label class="search-field history-search">
         <span class="hidden">${escapeHtml(t("searchSessions"))}</span>
         <input id="panel-session-filter" type="search" autocomplete="off" value="${escapeHtml(state.sessionFilter)}" placeholder="${escapeHtml(t("searchSessions"))}">
       </label>
-      <div class="session-stack" style="margin-top:14px;">${sessions.length ? sessions.map((session) => sessionRow(session)).join("") : emptyState(t("noSessions"))}</div>
+      <div class="history-groups">
+        ${
+          groups.length
+            ? groups
+                .map(
+                  (group) => `
+                    <section class="history-group">
+                      <h4>${escapeHtml(group.label)}</h4>
+                      <div class="history-list">${group.items.map(historyRow).join("")}</div>
+                    </section>
+                  `
+                )
+                .join("")
+            : emptyState(t("noSessions"))
+        }
+      </div>
     </section>
+  `;
+}
+
+function historyRow(item) {
+  if (item.kind === "session") {
+    const active = state.selectedSessionId === item.session.sessionId ? " active" : "";
+    return `
+      <article class="history-row${active}">
+        <button type="button" class="history-main" data-open-session="${escapeHtml(item.session.sessionId)}">
+          <div class="history-copy">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.summary || item.subtitle)}</span>
+          </div>
+          <small>${escapeHtml(formatDateTime(item.updatedAt))}</small>
+        </button>
+        <div class="history-actions">
+          <button type="button" class="history-action" data-continue-session="${escapeHtml(item.session.sessionId)}">${escapeHtml(t("continueHere"))}</button>
+          <button type="button" class="history-action danger" data-delete-session="${escapeHtml(item.session.sessionId)}">${escapeHtml(t("delete"))}</button>
+        </div>
+      </article>
+    `;
+  }
+  return `
+    <article class="history-row task">
+      <div class="history-main static">
+        <div class="history-copy">
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.summary || item.subtitle)}</span>
+        </div>
+        <small>${escapeHtml(formatDateTime(item.updatedAt))}</small>
+      </div>
+      ${
+        item.task.status === "awaiting_approval" && currentPermissions().approveTasks
+          ? `<div class="history-actions">
+               <button type="button" class="history-action" data-approve-task="${escapeHtml(item.task.taskId)}">${escapeHtml(t("approve"))}</button>
+               <button type="button" class="history-action" data-reject-task="${escapeHtml(item.task.taskId)}">${escapeHtml(t("reject"))}</button>
+             </div>`
+          : ""
+      }
+    </article>
   `;
 }
 

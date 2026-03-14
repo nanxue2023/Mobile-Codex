@@ -1114,6 +1114,141 @@ pre {
   word-break: break-word;
 }
 
+.history-list {
+  display: grid;
+  gap: 6px;
+}
+
+.history-shell {
+  display: grid;
+  gap: 14px;
+}
+
+.history-shell-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-search {
+  margin-top: 2px;
+}
+
+.history-groups {
+  display: grid;
+  gap: 18px;
+}
+
+.history-group {
+  display: grid;
+  gap: 8px;
+}
+
+.history-group h4 {
+  color: var(--ink-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.history-row {
+  display: grid;
+  gap: 6px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-row.active {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--r-md);
+  border-bottom-color: transparent;
+  padding: 10px 10px;
+}
+
+.history-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.history-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.history-main.static {
+  cursor: default;
+  opacity: 0.92;
+}
+
+.history-main strong {
+  font-size: 0.92rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-main span {
+  color: var(--ink-secondary);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.history-main small {
+  color: var(--ink-muted);
+  font-size: 0.74rem;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.history-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.history-action,
+.history-clear {
+  padding: 6px 10px;
+  font-size: 0.76rem;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-full);
+  background: transparent;
+  color: var(--ink-secondary);
+}
+
+.history-action.danger {
+  color: #ffb4b4;
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.10);
+}
+
+.history-row.task .history-main strong::before {
+  content: "Task";
+  display: inline-block;
+  margin-right: 8px;
+  color: var(--ink-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 /* ── Keyboard Active ── */
 body.keyboard-active #recent-tasks-section,
 body.keyboard-active #priority-section {

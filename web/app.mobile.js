@@ -2180,23 +2180,28 @@ async function handleDeleteAllSessions() {
   if (!confirm(t("deleteAllConfirm", { count: sessions.length }))) {
     return;
   }
-  await Promise.all(sessions.map(async (session) => {
+  const agentId = state.selectedAgentId;
+  for (const session of sessions) {
     await api("/api/admin/tasks", {
       method: "POST",
       body: {
-        agentId: state.selectedAgentId,
+        agentId,
         type: "delete_session",
         title: t("delete"),
         sessionId: session.sessionId
       }
     });
-    removeSessionFromLocalState(state.selectedAgentId, session.sessionId);
+    removeSessionFromLocalState(agentId, session.sessionId);
     if (state.selectedSessionId === session.sessionId) {
       clearSelectedSession();
     }
-  }));
+  }
   state.swipedSessionId = "";
-  await refresh();
+  render();
+  renderOverlay();
+  setTimeout(() => {
+    refresh().catch(() => {});
+  }, 1200);
 }
 
 async function handleDeleteSession(sessionId) {
@@ -2205,18 +2210,29 @@ async function handleDeleteSession(sessionId) {
   if (!confirm(t("deleteSessionConfirm", { label }))) {
     return;
   }
-  await submitTask({
-    agentId: state.selectedAgentId,
-    type: "delete_session",
-    title: t("delete"),
-    sessionId
+  const agentId = state.selectedAgentId;
+  await api("/api/admin/tasks", {
+    method: "POST",
+    body: {
+      agentId,
+      type: "delete_session",
+      title: t("delete"),
+      sessionId
+    }
   });
-  removeSessionFromLocalState(state.selectedAgentId, sessionId);
+  removeSessionFromLocalState(agentId, sessionId);
   if (state.selectedSessionId === sessionId) {
     clearSelectedSession();
   }
+  if (state.overlay?.view === "session" && state.overlay.sessionId === sessionId) {
+    state.overlay = { kind: "panel", view: "sessions" };
+  }
   state.swipedSessionId = "";
   render();
+  renderOverlay();
+  setTimeout(() => {
+    refresh().catch(() => {});
+  }, 1200);
 }
 
 function bindGlobalEvents() {

@@ -1074,6 +1074,46 @@ pre {
   overflow-x: auto;
 }
 
+.chat-thread {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-bubble {
+  max-width: 86%;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  color: var(--ink);
+}
+
+.chat-bubble.user {
+  justify-self: end;
+  background: rgba(124, 92, 252, 0.1);
+  border-color: rgba(124, 92, 252, 0.22);
+}
+
+.chat-bubble.assistant {
+  justify-self: start;
+  background: var(--glass-strong);
+}
+
+.chat-bubble strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-secondary);
+}
+
+.chat-bubble p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ── Keyboard Active ── */
 body.keyboard-active #recent-tasks-section,
 body.keyboard-active #priority-section {

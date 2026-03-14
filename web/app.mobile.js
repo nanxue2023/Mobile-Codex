@@ -60,6 +60,9 @@ const translations = {
     runTask: "Run",
     historyEyebrow: "History",
     recentTasks: "Recent Tasks",
+    openSession: "Open",
+    askConversationHint: "Pick a session to continue, or start a new Codex task below.",
+    currentConversation: "Current Conversation",
     sessionEyebrow: "Sessions",
     codexSessions: "Codex Sessions",
     sessionsHint: "Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.",
@@ -263,6 +266,9 @@ const translations = {
     runTask: "执行",
     historyEyebrow: "历史",
     recentTasks: "最近任务",
+    openSession: "打开",
+    askConversationHint: "先选择一个会话继续，或者直接在下方发起新的 Codex 任务。",
+    currentConversation: "当前对话",
     sessionEyebrow: "会话",
     codexSessions: "Codex 会话",
     sessionsHint: "显示当前所选 agent 的最近会话。预览只保留在你的手机和 relay 内存中。",
@@ -468,7 +474,7 @@ const logRow = document.querySelector("#log-row");
 const resumeSessionBanner = document.querySelector("#resume-session-banner");
 const resumeSessionLabel = document.querySelector("#resume-session-label");
 const clearSessionSelectionButton = document.querySelector("#clear-session-selection");
-const tasksEl = document.querySelector("#tasks");
+const askThreadEl = document.querySelector("#ask-thread");
 const priorityEventsEl = document.querySelector("#priority-events");
 const askFootnote = document.querySelector("#ask-footnote");
 const moreBadge = document.querySelector("#more-badge");
@@ -1354,10 +1360,9 @@ function renderBadges() {
 }
 
 function renderAsk() {
-  const tasks = (state.data?.tasks || []).slice(0, 6);
   const permissions = currentPermissions();
   taskForm.classList.toggle("hidden", !permissions.createTasks || !currentWorkspace() || !selectedAgent());
-  tasksEl.innerHTML = tasks.length ? tasks.map(taskCard).join("") : emptyState(t("noTasks"));
+  askThreadEl.innerHTML = askThreadHtml();
   syncTaskFields();
 }
 
@@ -1369,6 +1374,39 @@ function renderAgents() {
 function renderSessionsScreen() {
   if (!sessionsScreenContent) return;
   sessionsScreenContent.innerHTML = sessionsDrawerHtml();
+}
+
+function askThreadHtml() {
+  const session = selectedSession();
+  if (!session) {
+    return emptyState(t("askConversationHint"));
+  }
+  const readTask = latestSessionReadTask(session.sessionId);
+  const messages = Array.isArray(readTask?.result?.messages) && readTask.result.messages.length
+    ? readTask.result.messages
+    : (session.preview || []);
+  return `
+    <div class="section-head compact" style="margin-bottom:12px;">
+      <div>
+        <p class="eyebrow">${escapeHtml(t("sessionEyebrow"))}</p>
+        <h3>${escapeHtml(t("currentConversation"))}</h3>
+      </div>
+    </div>
+    <div class="chat-thread">
+      ${messages.length
+        ? messages
+            .map(
+              (item) => `
+                <article class="chat-bubble ${item.role === "assistant" ? "assistant" : "user"}">
+                  <strong>${escapeHtml(formatPreviewRole(item.role))}</strong>
+                  <p>${escapeHtml(item.text)}</p>
+                </article>
+              `
+            )
+            .join("")
+        : emptyState(t("noPreview"))}
+    </div>
+  `;
 }
 
 function renderAgentsScreen() {
@@ -1422,8 +1460,18 @@ function filteredSessions() {
 
 function sessionsDrawerHtml() {
   const sessions = filteredSessions();
+  const tasks = (state.data?.tasks || []).slice(0, 12);
   return `
-    <section class="card">
+    <section class="section-block">
+      <div class="section-head compact">
+        <div>
+          <p class="eyebrow">${escapeHtml(t("historyEyebrow"))}</p>
+          <h3>${escapeHtml(t("recentTasks"))}</h3>
+        </div>
+      </div>
+      <div>${tasks.length ? tasks.map(taskCard).join("") : emptyState(t("noTasks"))}</div>
+    </section>
+    <section class="section-block">
       <div class="section-head compact">
         <div>
           <p class="eyebrow">${escapeHtml(t("sessionEyebrow"))}</p>
@@ -1634,20 +1682,20 @@ function sessionRow(session) {
     .map((item) => `<div class="preview-line ${item.role === "assistant" ? "assistant" : "user"}"><strong>${escapeHtml(formatPreviewRole(item.role))}</strong> ${escapeHtml(item.text)}</div>`)
     .join("");
   return `
-    <article class="session-swipe" data-session-id="${escapeHtml(session.sessionId)}">
-      <div class="session-delete">
-        <button type="button" data-delete-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("delete"))}</button>
-      </div>
-      <div class="session-card-content" data-session-id="${escapeHtml(session.sessionId)}">
-        <header>
-          <div>
-            <strong>${escapeHtml(session.title || t("codexSessionDefault"))}</strong>
-            <p>${escapeHtml(session.cwd || ".")}</p>
-          </div>
-          <div class="row-meta">${escapeHtml(formatDateTime(session.updatedAt))}</div>
-        </header>
-        ${session.firstUserMessage ? `<p class="task-body">${escapeHtml(session.firstUserMessage)}</p>` : ""}
-        <div class="preview-stack">${preview || `<div class="preview-line">${escapeHtml(t("noPreview"))}</div>`}</div>
+    <article class="agent-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(session.title || t("codexSessionDefault"))}</strong>
+          <p>${escapeHtml(session.cwd || ".")}</p>
+        </div>
+        <div class="row-meta">${escapeHtml(formatDateTime(session.updatedAt))}</div>
+      </header>
+      ${session.firstUserMessage ? `<p class="task-body">${escapeHtml(session.firstUserMessage)}</p>` : ""}
+      <div class="preview-stack">${preview || `<div class="preview-line">${escapeHtml(t("noPreview"))}</div>`}</div>
+      <div class="actions">
+        <button type="button" class="secondary" data-open-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("openSession"))}</button>
+        <button type="button" data-continue-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("continueHere"))}</button>
+        <button type="button" class="danger-action" data-delete-session="${escapeHtml(session.sessionId)}">${escapeHtml(t("delete"))}</button>
       </div>
     </article>
   `;
@@ -2313,6 +2361,26 @@ function bindGlobalEvents() {
           openPanel("agent", { agentId: openAgentId });
           return;
         }
+        const continueSessionId = event.target.getAttribute("data-continue-session");
+        if (continueSessionId) {
+          state.selectedSessionId = continueSessionId;
+          state.taskType = "codex_exec";
+          setActiveTab("ask");
+          taskPrompt.focus();
+          return;
+        }
+        const approveTaskId = event.target.getAttribute("data-approve-task");
+        if (approveTaskId) {
+          await api(`/api/admin/tasks/${approveTaskId}/approve`, { method: "POST" });
+          await refresh();
+          return;
+        }
+        const rejectTaskId = event.target.getAttribute("data-reject-task");
+        if (rejectTaskId) {
+          await api(`/api/admin/tasks/${rejectTaskId}/reject`, { method: "POST" });
+          await refresh();
+          return;
+        }
         const approvePairId = event.target.getAttribute("data-approve-pair");
         if (approvePairId) {
           await api(`/api/admin/pair-requests/${approvePairId}/approve`, { method: "POST" });
@@ -2346,17 +2414,9 @@ function bindGlobalEvents() {
           return;
         }
 
-        // session card click in sessions screen
-        const sessionContent = event.target.closest(".session-card-content");
-        if (sessionContent) {
-          const sessionId = sessionContent.dataset.sessionId;
-          if (state.swipedSessionId === sessionId) {
-            state.swipedSessionId = "";
-            render();
-            return;
-          }
-          if (gesture?.moved) return;
-          openPanel("session", { sessionId });
+        const openSessionId = event.target.getAttribute("data-open-session");
+        if (openSessionId) {
+          openPanel("session", { sessionId: openSessionId });
           return;
         }
         const deleteSessionId = event.target.getAttribute("data-delete-session");
@@ -2421,11 +2481,6 @@ function bindGlobalEvents() {
       }
     });
 
-    // Swipe support for sessions screen
-    container.addEventListener("pointerdown", (event) => { startSwipe(event); });
-    container.addEventListener("pointermove", (event) => { moveSwipe(event); });
-    container.addEventListener("pointerup", (event) => { endSwipe(event); });
-    container.addEventListener("pointercancel", (event) => { endSwipe(event); });
   }
 
   taskTypeButtons.forEach((button) => {
@@ -2496,22 +2551,6 @@ function bindGlobalEvents() {
     }
   });
 
-  tasksEl.addEventListener("click", async (event) => {
-    const approveId = event.target.getAttribute("data-approve-task");
-    const rejectId = event.target.getAttribute("data-reject-task");
-    try {
-      if (approveId) {
-        await api(`/api/admin/tasks/${approveId}/approve`, { method: "POST" });
-        await refresh();
-      } else if (rejectId) {
-        await api(`/api/admin/tasks/${rejectId}/reject`, { method: "POST" });
-        await refresh();
-      }
-    } catch (error) {
-      alert(String(error.message || error));
-    }
-  });
-
   priorityEventsEl.addEventListener("click", async (event) => {
     const approveId = event.target.getAttribute("data-approve-pair");
     const rejectId = event.target.getAttribute("data-reject-pair");
@@ -2577,8 +2616,8 @@ function bindGlobalEvents() {
 
   panelContent.addEventListener("click", async (event) => {
     try {
-      const sessionContent = event.target.closest(".session-card-content");
       const continueSessionId = event.target.getAttribute("data-continue-session");
+      const openSessionId = event.target.getAttribute("data-open-session");
       const readSessionId = event.target.getAttribute("data-read-session");
       const deleteSessionId = event.target.getAttribute("data-delete-session");
       const wantsDeleteAllSessions = event.target.hasAttribute("data-delete-all-sessions");
@@ -2602,17 +2641,8 @@ function bindGlobalEvents() {
         renderOverlay();
         return;
       }
-      if (sessionContent && state.overlay?.view === "sessions") {
-        const sessionId = sessionContent.dataset.sessionId;
-        if (state.swipedSessionId === sessionId) {
-          state.swipedSessionId = "";
-          renderOverlay();
-          return;
-        }
-        if (gesture?.moved) {
-          return;
-        }
-        openPanel("session", { sessionId });
+      if (openSessionId) {
+        openPanel("session", { sessionId: openSessionId });
         return;
       }
       if (wantsClearCache) {
@@ -2647,8 +2677,7 @@ function bindGlobalEvents() {
       if (continueSessionId) {
         state.selectedSessionId = continueSessionId;
         state.taskType = "codex_exec";
-        state.overlay = null;
-        render();
+        setActiveTab("ask");
         taskPrompt.focus();
         return;
       }

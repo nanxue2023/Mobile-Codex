@@ -2222,6 +2222,14 @@ function bindGlobalEvents() {
   document.querySelector("#lang-en").addEventListener("click", () => setLocale("en"));
   document.querySelector("#lang-zh").addEventListener("click", () => setLocale("zh"));
 
+  passkeyLoginButton.addEventListener("click", async () => {
+    try {
+      await loginWithPasskey();
+    } catch (error) {
+      alert(String(error.message || error));
+    }
+  });
+
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {

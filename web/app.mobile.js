@@ -448,7 +448,6 @@ const loginForm = document.querySelector("#login-form");
 const currentUserLine = document.querySelector("#current-user-line");
 const workspaceTitle = document.querySelector("#workspace-title");
 const statusLine = document.querySelector("#status-line");
-const refreshButton = document.querySelector("#refresh-button");
 const taskForm = document.querySelector("#task-form");
 const taskPrompt = document.querySelector("#task-prompt");
 const taskPromptLabel = document.querySelector("#task-prompt-label");
@@ -2231,11 +2230,6 @@ function bindGlobalEvents() {
       alert(String(error.message || error));
     }
   });
-
-  refreshButton.addEventListener("click", () => {
-    refresh().catch((error) => alert(String(error.message || error)));
-  });
-
   for (const button of tabButtons) {
     button.addEventListener("click", () => {
       if (button.dataset.tab) {

@@ -86,10 +86,8 @@
       </section>
 
       <section id="dashboard" class="mobile-shell hidden">
-        <header class="shell-header">
-          <div class="shell-copy">
-            <h2 data-i18n="appTitle">Mobile Codex</h2>
-          </div>
+        <header style="padding: 8px 4px 0;">
+          <h2 data-i18n="appTitle" style="font-size: 1.4rem; color: var(--ink);">Mobile Codex</h2>
         </header>
 
         <!-- ═══ Tab: Ask ═══ -->
@@ -99,12 +97,10 @@
               <div>
                 <h3 id="workspace-title" data-i18n="currentWorkspace">Current Workspace</h3>
               </div>
-              <button id="refresh-button" type="button" class="ghost-action" data-i18n="refresh">Refresh</button>
             </div>
             <p id="status-line" class="hint">Connecting…</p>
             <p id="current-user-line" class="current-user-line">Signed out.</p>
-            <div class="console-actions">
-              <button type="button" class="secondary" data-open-panel="context" data-i18n="context">Context</button>
+            <div class="console-actions hidden">
               <span id="more-badge" class="inline-badge hidden"></span>
             </div>
           </section>

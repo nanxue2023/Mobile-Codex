@@ -449,7 +449,6 @@ const currentUserLine = document.querySelector("#current-user-line");
 const workspaceTitle = document.querySelector("#workspace-title");
 const statusLine = document.querySelector("#status-line");
 const refreshButton = document.querySelector("#refresh-button");
-const logoutButton = document.querySelector("#logout-button");
 const taskForm = document.querySelector("#task-form");
 const taskPrompt = document.querySelector("#task-prompt");
 const taskPromptLabel = document.querySelector("#task-prompt-label");
@@ -1505,6 +1504,9 @@ function controlPanelHtml() {
           <span>${escapeHtml(t("clearCacheHint"))}</span>
         </button>
       </div>
+      <div style="margin-top:18px;">
+        <button type="button" class="secondary" data-logout style="width:100%;">${escapeHtml(t("logout"))}</button>
+      </div>
     </section>
   `;
 }
@@ -2233,9 +2235,6 @@ function bindGlobalEvents() {
   refreshButton.addEventListener("click", () => {
     refresh().catch((error) => alert(String(error.message || error)));
   });
-  logoutButton.addEventListener("click", () => {
-    logout().catch(() => {});
-  });
 
   for (const button of tabButtons) {
     button.addEventListener("click", () => {
@@ -2298,6 +2297,11 @@ function bindGlobalEvents() {
           sessionStorage.removeItem(taskCacheKey);
           sessionStorage.removeItem(sessionCacheKey);
           render();
+          return;
+        }
+        const wantsLogout = event.target.hasAttribute("data-logout");
+        if (wantsLogout) {
+          logout().catch(() => {});
           return;
         }
 
@@ -2570,6 +2574,10 @@ function bindGlobalEvents() {
         sessionStorage.removeItem(sessionCacheKey);
         render();
         renderOverlay();
+        return;
+      }
+      if (event.target.hasAttribute("data-logout")) {
+        logout().catch(() => {});
         return;
       }
       if (approvePairId) {

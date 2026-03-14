@@ -88,14 +88,7 @@
       <section id="dashboard" class="mobile-shell hidden">
         <header class="shell-header">
           <div class="shell-copy">
-            <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
             <h2 data-i18n="appTitle">Mobile Codex</h2>
-          </div>
-          <div class="shell-tools">
-            <div class="header-actions">
-              <button id="refresh-button" type="button" class="secondary" data-i18n="refresh">Refresh</button>
-              <button id="logout-button" type="button" class="secondary" data-i18n="logout">Logout</button>
-            </div>
           </div>
         </header>
 
@@ -104,16 +97,15 @@
           <section class="section-block console-status-block">
             <div class="section-head">
               <div>
-                <p class="eyebrow" data-i18n="controlPlane">Control Plane</p>
                 <h3 id="workspace-title" data-i18n="currentWorkspace">Current Workspace</h3>
               </div>
+              <button id="refresh-button" type="button" class="ghost-action" data-i18n="refresh">Refresh</button>
             </div>
             <p id="status-line" class="hint">Connecting…</p>
             <p id="current-user-line" class="current-user-line">Signed out.</p>
             <div class="console-actions">
               <button type="button" class="secondary" data-open-panel="context" data-i18n="context">Context</button>
-              <button type="button" class="secondary" data-open-panel="sessions" data-i18n="tabSessions">Sessions</button>
-              <button type="button" class="secondary" data-open-panel="control"><span data-i18n="control">Control</span> <span id="more-badge" class="inline-badge hidden"></span></button>
+              <span id="more-badge" class="inline-badge hidden"></span>
             </div>
           </section>
 

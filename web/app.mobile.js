@@ -2325,7 +2325,7 @@ function bindGlobalEvents() {
     });
 
     container.addEventListener("change", (event) => {
-      if (event.target.id === "panel-session-filter" || event.target.id === "screen-session-filter") {
+      if (event.target.id === "panel-session-filter") {
         state.sessionFilter = event.target.value;
         render();
       } else if (event.target.id === "context-agent-id") {
@@ -2337,6 +2337,14 @@ function bindGlobalEvents() {
       } else if (event.target.id === "invite-type") {
         state.inviteType = event.target.value;
         render();
+      }
+    });
+
+    container.addEventListener("input", (event) => {
+      if (event.target.id === "panel-session-filter") {
+        state.sessionFilter = event.target.value;
+        renderSessionsScreen();
+        renderOverlay();
       }
     });
 
@@ -2505,6 +2513,13 @@ function bindGlobalEvents() {
       render();
     } else if (event.target.id === "context-workspace-id" && event.target.value) {
       switchWorkspace(event.target.value).catch((error) => alert(String(error.message || error)));
+    }
+  });
+
+  panelContent.addEventListener("input", (event) => {
+    if (event.target.id === "panel-session-filter") {
+      state.sessionFilter = event.target.value;
+      renderOverlay();
     }
   });
 

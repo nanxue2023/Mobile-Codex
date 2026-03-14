@@ -468,6 +468,7 @@ const logRow = document.querySelector("#log-row");
 const resumeSessionBanner = document.querySelector("#resume-session-banner");
 const resumeSessionLabel = document.querySelector("#resume-session-label");
 const clearSessionSelectionButton = document.querySelector("#clear-session-selection");
+const tasksEl = document.querySelector("#tasks");
 const priorityEventsEl = document.querySelector("#priority-events");
 const askFootnote = document.querySelector("#ask-footnote");
 const moreBadge = document.querySelector("#more-badge");
@@ -2260,13 +2261,6 @@ function bindGlobalEvents() {
     }
   });
 
-  passkeyLoginButton.addEventListener("click", async () => {
-    try {
-      await loginWithPasskey();
-    } catch (error) {
-      alert(String(error.message || error));
-    }
-  });
   for (const button of tabButtons) {
     button.addEventListener("click", () => {
       if (button.dataset.tab) {

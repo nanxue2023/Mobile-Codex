@@ -854,6 +854,7 @@ pre {
   width: 100px;
   display: flex;
   align-items: stretch;
+  z-index: 1;
 }
 
 .session-delete button {
@@ -875,6 +876,7 @@ pre {
   touch-action: pan-y;
   will-change: transform;
   transition: transform var(--dur-fast) ease;
+  z-index: 2;
 }
 
 .session-card-content.open {
@@ -891,6 +893,21 @@ pre {
   display: grid;
   gap: 6px;
   margin-top: 10px;
+  max-height: 200px; /* Limit session card display length */
+  overflow-y: auto;
+  padding-right: 4px; /* Space for scrollbar */
+}
+
+/* Custom scrollbar for preview stack */
+.preview-stack::-webkit-scrollbar {
+  width: 4px;
+}
+.preview-stack::-webkit-scrollbar-track {
+  background: transparent;
+}
+.preview-stack::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 4px;
 }
 
 .preview-line {

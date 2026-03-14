@@ -63,7 +63,9 @@ const translations = {
     sessionEyebrow: "Sessions",
     codexSessions: "Codex Sessions",
     sessionsHint: "Recent sessions from the selected agent. Previews stay on your phone and in relay memory only.",
-    searchSessions: "Search sessions",
+    searchSessions: "Search sessions...",
+    deleteAll: "Clear All",
+    deleteAllConfirm: "Are you sure you want to delete all {count} sessions?",
     agentsEyebrow: "Agents",
     agentsTitle: "Devices And Approvals",
     pairNewAgent: "Pair New Agent",
@@ -264,7 +266,9 @@ const translations = {
     sessionEyebrow: "会话",
     codexSessions: "Codex 会话",
     sessionsHint: "显示当前所选 agent 的最近会话。预览只保留在你的手机和 relay 内存中。",
-    searchSessions: "搜索会话",
+    searchSessions: "搜索会话...",
+    deleteAll: "清空全部",
+    deleteAllConfirm: "确定要删除全部 {count} 个会话吗？",
     agentsEyebrow: "Agent",
     agentsTitle: "设备与审批",
     pairNewAgent: "新增配对",
@@ -464,7 +468,6 @@ const logRow = document.querySelector("#log-row");
 const resumeSessionBanner = document.querySelector("#resume-session-banner");
 const resumeSessionLabel = document.querySelector("#resume-session-label");
 const clearSessionSelectionButton = document.querySelector("#clear-session-selection");
-const tasksEl = document.querySelector("#tasks");
 const priorityEventsEl = document.querySelector("#priority-events");
 const askFootnote = document.querySelector("#ask-footnote");
 const moreBadge = document.querySelector("#more-badge");
@@ -1425,6 +1428,7 @@ function sessionsDrawerHtml() {
           <p class="eyebrow">${escapeHtml(t("sessionEyebrow"))}</p>
           <h3>${escapeHtml(t("codexSessions"))}</h3>
         </div>
+        ${sessions.length ? `<button type="button" class="danger-action" style="padding: 6px 12px; font-size: 0.8rem;" data-delete-all-sessions>${escapeHtml(t("deleteAll"))}</button>` : ""}
       </div>
       <p class="hint">${escapeHtml(t("sessionsHint"))}</p>
       <label class="search-field" style="margin-top:12px;">
@@ -2169,6 +2173,31 @@ function endSwipe(event) {
   renderOverlay();
 }
 
+async function handleDeleteAllSessions() {
+  const sessions = filteredSessions();
+  if (!sessions.length) return;
+  if (!confirm(t("deleteAllConfirm", { count: sessions.length }))) {
+    return;
+  }
+  await Promise.all(sessions.map(async (session) => {
+    await api("/api/admin/tasks", {
+      method: "POST",
+      body: {
+        agentId: state.selectedAgentId,
+        type: "delete_session",
+        title: t("delete"),
+        sessionId: session.sessionId
+      }
+    });
+    removeSessionFromLocalState(state.selectedAgentId, session.sessionId);
+    if (state.selectedSessionId === session.sessionId) {
+      clearSelectedSession();
+    }
+  }));
+  state.swipedSessionId = "";
+  await refresh();
+}
+
 async function handleDeleteSession(sessionId) {
   const session = findSessionById(sessionId);
   const label = session ? `${session.title} (${session.sessionId})` : sessionId;
@@ -2317,6 +2346,10 @@ function bindGlobalEvents() {
           await handleDeleteSession(deleteSessionId);
           return;
         }
+        if (event.target.hasAttribute("data-delete-all-sessions")) {
+          await handleDeleteAllSessions();
+          return;
+        }
       } catch (error) {
         alert(String(error.message || error));
       }
@@ -2412,6 +2445,9 @@ function bindGlobalEvents() {
         body.title = t("logLabel", { log: logSelect.value });
       }
       await submitTask(body);
+      if (type === "codex_exec") {
+        taskPrompt.value = "";
+      }
       render();
     } catch (error) {
       alert(String(error.message || error));
@@ -2527,6 +2563,7 @@ function bindGlobalEvents() {
       const continueSessionId = event.target.getAttribute("data-continue-session");
       const readSessionId = event.target.getAttribute("data-read-session");
       const deleteSessionId = event.target.getAttribute("data-delete-session");
+      const wantsDeleteAllSessions = event.target.hasAttribute("data-delete-all-sessions");
       const revokeAgentId = event.target.getAttribute("data-revoke-agent");
       const revokePasskeyId = event.target.getAttribute("data-revoke-passkey");
       const revokeInviteId = event.target.getAttribute("data-revoke-invite");
@@ -2609,6 +2646,10 @@ function bindGlobalEvents() {
       }
       if (deleteSessionId) {
         await handleDeleteSession(deleteSessionId);
+        return;
+      }
+      if (wantsDeleteAllSessions) {
+        await handleDeleteAllSessions();
         return;
       }
       if (revokeAgentId) {
